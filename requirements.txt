@@ -1,0 +1,6 @@
+pypdf>=5,<7
+playwright>=1.48,<2
+PyYAML>=6,<7
+fonttools>=4,<5
+pypdfium2>=4.30,<6
+Pillow>=10,<13

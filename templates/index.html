@@ -1,0 +1,616 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Council archive</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23143152'/%3E%3Cpath d='M8 9h16v4H8zm0 6h16v4H8zm0 6h16v4H8z' fill='white'/%3E%3C/svg%3E">
+<style>
+:root{color-scheme:light;
+  --bg:#f4f5f2;--surface:#ffffff;--surface-2:#f8f9f7;--sunken:#eef0ec;
+  --ink:#1d2433;--ink-2:#4a5263;--muted:#6b7282;--line:#e3e6e0;--line-2:#d3d8d0;
+  --accent:#1f5f8b;--accent-ink:#ffffff;--accent-soft:#e7f0f6;--accent-hover:#174b6e;
+  --good:#23704a;--good-soft:#e5f3eb;--warn:#8a5a00;--warn-soft:#fbf1dc;--new:#1f5f8b;--new-soft:#e3eef7;
+  --violet:#5b4397;--violet-soft:#efeaf8;--danger:#b3382c;
+  --shadow:0 1px 2px rgba(29,36,51,.05),0 2px 8px rgba(29,36,51,.04);
+  --shadow-lg:0 12px 32px rgba(29,36,51,.16);
+  --radius:12px;--radius-sm:8px;
+  --font:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+  --display:"Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+  --mono:"Cascadia Mono",Consolas,ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;
+  --bg:#14171d;--surface:#1c2028;--surface-2:#20252e;--sunken:#171b22;
+  --ink:#e8eaee;--ink-2:#bfc4ce;--muted:#8e95a3;--line:#2b313b;--line-2:#39404c;
+  --accent:#6aaee0;--accent-ink:#0e1a24;--accent-soft:#1e3242;--accent-hover:#8cc2ea;
+  --good:#7fcf9f;--good-soft:#1b3326;--warn:#e8b75c;--warn-soft:#3a2e15;--new:#8cc2ea;--new-soft:#1e3242;
+  --violet:#b9a6ec;--violet-soft:#2c2640;--danger:#f08a7e;
+  --shadow:0 1px 2px rgba(0,0,0,.3);--shadow-lg:0 12px 32px rgba(0,0,0,.5)}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--font);padding-bottom:110px;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-underline-offset:2px;text-decoration-thickness:1px}a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+h2{font:600 18px/1.3 var(--display);margin:0 0 14px;letter-spacing:-.01em}h3{font:600 15px/1.35 var(--display);margin:0}p{margin:6px 0}
+.muted{color:var(--muted);font-size:13.5px}label.field{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:5px;letter-spacing:.01em}
+
+/* Header */
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:14px max(24px,calc((100vw - 1200px)/2));display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+header h1{font:650 19px/1 var(--display);margin:0 auto 0 0;display:flex;align-items:center;gap:10px;letter-spacing:-.01em}
+header h1 .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink)}
+header label{color:var(--muted);font-size:13px;display:flex;gap:8px;align-items:center}header select{min-width:220px}
+
+/* Controls */
+button,input,select,textarea{font:inherit;color:var(--ink)}
+input,select,textarea{padding:8px 11px;border:1px solid var(--line-2);border-radius:var(--radius-sm);background:var(--surface);transition:border-color .15s,box-shadow .15s}
+input:hover,select:hover{border-color:var(--muted)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;padding:0;margin:0;cursor:pointer}
+button{padding:8px 15px;border-radius:var(--radius-sm);border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,box-shadow .15s}
+button:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
+button.secondary{background:var(--surface);color:var(--ink);border-color:var(--line-2);font-weight:550}
+button.secondary:hover:not(:disabled){background:var(--surface-2);border-color:var(--muted)}
+button.link{background:none;border:0;color:var(--accent);padding:0;font-weight:550;text-decoration:underline;text-underline-offset:2px}
+button.link:hover:not(:disabled){background:none}
+button:disabled{opacity:.45;cursor:not-allowed}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.bar.end{justify-content:flex-end}.grow{flex:1;min-width:200px}.spacer{margin-left:auto}
+label.bar{font-size:14px;color:var(--ink-2);cursor:pointer}
+
+/* Layout */
+main{max-width:1248px;margin:auto;padding:0 24px 24px}
+.panel{background:var(--surface);padding:22px 24px;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:16px;box-shadow:var(--shadow)}
+.warning{color:var(--warn);background:var(--warn-soft);padding:7px 11px;border-radius:var(--radius-sm);font-size:14px}
+
+/* Tabs as a segmented control */
+nav.tabs{display:inline-flex;gap:2px;margin:20px 0 18px;padding:4px;background:var(--sunken);border:1px solid var(--line);border-radius:11px;flex-wrap:wrap}
+nav.tabs button{background:none;color:var(--ink-2);border:0;border-radius:8px;padding:8px 16px;font-weight:600;display:inline-flex;align-items:center}
+nav.tabs button:hover:not(:disabled){background:var(--surface-2);color:var(--ink)}
+nav.tabs button[aria-current=page]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:var(--danger);color:#fff;font-size:12px;font-weight:700;line-height:20px;text-align:center;margin-left:7px}
+
+/* Status bar */
+#jobbar{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+#jobbar .inner{max-width:1248px;margin:auto;padding:10px 24px}
+#jobtext{font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px}
+#jobtext::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--good);flex:none}
+#jobbar:has(#jobprogress:not([hidden])) #jobtext::before{background:var(--accent);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+#archivestats{font-size:13px}
+#jobbar progress{width:100%;height:6px;margin:8px 0 2px;appearance:none;border:0;border-radius:3px;background:var(--sunken);overflow:hidden;accent-color:var(--accent)}
+#jobbar progress::-webkit-progress-bar{background:var(--sunken)}#jobbar progress::-webkit-progress-value{background:var(--accent);border-radius:3px}
+#jobbar details summary{font-size:13px;color:var(--muted);cursor:pointer;margin-top:2px}
+#notice:empty,#jobdetail:empty{display:none}#notice{color:var(--warn);font-weight:600;font-size:14px}
+#log{font:12.5px/1.6 var(--mono);white-space:pre-wrap;max-height:220px;overflow:auto;overflow-wrap:anywhere;background:var(--sunken);padding:10px 12px;border-radius:var(--radius-sm);color:var(--ink-2)}
+
+/* Status pills */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:650;padding:2px 9px;border-radius:999px;white-space:nowrap;vertical-align:2px;letter-spacing:.01em}
+.pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill.saved{background:var(--good-soft);color:var(--good)}.pill.missing{background:var(--warn-soft);color:var(--warn)}
+.pill.new{background:var(--new-soft);color:var(--new)}.pill.upcoming{background:var(--violet-soft);color:var(--violet)}
+
+/* Paper rows */
+.paper{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;padding:12px 10px;margin:0 -10px;border-radius:var(--radius-sm);align-items:start;transition:background .12s}
+.paper+.paper{border-top:1px solid var(--line)}
+.paper:hover{background:var(--surface-2)}
+.paper:has(input:checked){background:var(--accent-soft)}
+.paper .title{font-weight:600;line-height:1.4}.paper .meta{font-size:13px;color:var(--muted);margin-top:2px}
+.paper .actions{display:flex;gap:14px;font-size:13.5px;flex-wrap:wrap;justify-content:flex-end;padding-top:1px}
+.paper input[type=checkbox],.meeting input[type=checkbox]{margin-top:3px}
+.group{border:1px solid var(--line);border-radius:var(--radius);padding:2px 18px 8px;margin-top:14px;background:var(--surface)}
+.grouphead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 0 10px;border-bottom:1px solid var(--line);margin-bottom:2px}
+
+/* Browse */
+.browse{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
+.browse>.panel:first-child{position:sticky;top:96px}
+#committeelist{max-height:calc(100vh - 230px);overflow:auto;margin:10px -8px 0;padding:0 4px}
+.committee{display:block;width:100%;text-align:left;background:none;color:var(--ink);border:0;border-radius:var(--radius-sm);padding:9px 12px;white-space:normal;font-weight:550;margin-bottom:1px}
+.committee:hover:not(:disabled){background:var(--surface-2)}
+.committee[aria-current=true]{background:var(--accent-soft);color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.committee small{display:block;color:var(--muted);font-size:12.5px;font-weight:400;margin-top:1px}
+.meeting{padding:14px 0}.meeting+.meeting{border-top:1px solid var(--line)}
+.meeting .row{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:start}
+.meeting .row strong{font-family:var(--display);font-weight:600}
+.meeting .row .bar button{padding:6px 12px;font-size:13.5px}
+.meeting .papers{margin:10px 0 0 30px;padding:4px 16px;border-left:2px solid var(--line-2);background:var(--surface-2);border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+
+/* Committee picker */
+.picker{position:relative;display:inline-block}
+.picker>summary{list-style:none;cursor:pointer;padding:8px 34px 8px 12px;border:1px solid var(--line-2);border-radius:var(--radius-sm);background:var(--surface);min-width:220px;max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+.picker>summary:hover{border-color:var(--muted)}
+.picker>summary::after{content:'';position:absolute;right:13px;top:50%;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg)}
+.picker>summary::-webkit-details-marker{display:none}
+.picker .body{position:absolute;z-index:20;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);width:min(420px,90vw);padding:12px}
+#searchpicker .body,#newpicker .body{left:auto;right:0}
+.picker .list{max-height:300px;overflow:auto;margin:8px -4px}
+.picker .list label{display:flex;gap:9px;padding:6px 8px;font-size:14px;align-items:flex-start;border-radius:6px;cursor:pointer}
+.picker .list label:hover{background:var(--surface-2)}
+.picker .list input{margin-top:2px}.picker input[type=search]{width:100%}
+
+/* Selection tray: floating */
+#tray{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:15;width:min(1200px,calc(100% - 32px));background:#1d2433;color:#fff;border-radius:14px;box-shadow:var(--shadow-lg)}
+#tray .inner{padding:10px 12px 10px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#traynote{color:#b9c0cc;font-size:14px}
+#tray button{background:#fff;color:#1d2433;border-color:#fff}#tray button:hover:not(:disabled){background:#e6e9ee;border-color:#e6e9ee}
+#tray button.secondary{background:transparent;color:#fff;border-color:#4a5263}#tray button.secondary:hover:not(:disabled){background:#2c3444}
+#traylist{max-height:40vh;overflow:auto;background:var(--surface);color:var(--ink);border-radius:10px;padding:4px 14px;width:100%;margin-top:4px}
+#traylist p{display:flex;justify-content:space-between;gap:12px;padding:8px 0;margin:0;font-size:14px}#traylist p+p{border-top:1px solid var(--line)}
+@media (prefers-color-scheme:dark){#tray{background:#2a303b;border:1px solid var(--line-2)}}
+
+/* Tables, results, dialogs, tools */
+table{width:100%;border-collapse:collapse}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:650}
+td,th{text-align:left;vertical-align:top;border-bottom:1px solid var(--line);padding:9px 10px;font-size:14px}tbody tr:hover{background:var(--surface-2)}
+.tablewrap{overflow:auto}
+.result{padding:4px 0}.result+.result{border-top:1px solid var(--line)}
+.result .paper{border-top:0}
+.excerpt{white-space:pre-line;font-size:14px;color:var(--ink-2);background:var(--surface-2);border-left:3px solid var(--line-2);padding:8px 12px;border-radius:0 6px 6px 0;margin-top:8px}
+dialog{border:1px solid var(--line);border-radius:16px;padding:26px;max-width:640px;width:calc(100% - 32px);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-lg)}
+dialog::backdrop{background:rgba(20,23,29,.45);backdrop-filter:blur(2px)}
+input[type=text],input[type=url],input:not([type]){width:100%}
+.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;align-items:start}.tools .panel{margin:0;height:100%}
+.tools .panel:not(.wide) p:not(.muted){color:var(--ink-2);font-size:14px}
+.wide{grid-column:1/-1}
+details>summary{cursor:pointer}
+main>p.muted{text-align:center;margin-top:24px}
+@media(max-width:800px){#jobbar{position:static}.browse{grid-template-columns:1fr}.browse>.panel:first-child{position:static}#committeelist{max-height:260px}
+  main{padding:0 16px 16px}#jobbar .inner{padding:10px 16px}header{padding:12px 16px}.panel{padding:16px}
+  nav.tabs{display:flex}nav.tabs button{flex:1;justify-content:center;padding:8px 10px}
+  .paper{grid-template-columns:auto 1fr}.paper .actions{grid-column:2;justify-content:flex-start}
+  .meeting .row{grid-template-columns:auto 1fr}.meeting .row .bar{grid-column:2}
+  #tray{bottom:8px;width:calc(100% - 16px)}#tray .inner{padding:10px 12px}}
+</style>
+
+<header><h1><span class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 6.5 8 3l6 3.5M3.5 7v5.5M6.5 7v5.5M9.5 7v5.5M12.5 7v5.5M2 13.5h12"/></svg></span>Council archive</h1>
+<label>Council <select id="council"><option value="">Add your first council</option></select></label>
+<button class="secondary" id="addtoggle">Add council</button></header>
+
+<div id="jobbar" role="region" aria-label="Current task"><div class="inner">
+<div class="bar"><span id="jobtext" role="status" aria-live="polite">Connecting…</span><span class="spacer muted" id="archivestats"></span><button class="secondary" id="stopjob" hidden>Stop</button></div>
+<progress id="jobprogress" hidden></progress>
+<p class="muted" id="jobdetail"></p><p id="notice" role="alert"></p>
+<details><summary class="muted">Activity log</summary><pre id="log">No activity in this session.</pre><p class="muted" id="root"></p></details>
+</div></div>
+
+<main>
+<nav class="tabs" aria-label="Sections">
+<button data-view="new" aria-current="page">New papers<span class="badge" id="newbadge" hidden></span></button>
+<button data-view="browse">Committees &amp; meetings</button>
+<button data-view="search">Search</button>
+<button data-view="tools">Tools</button>
+</nav>
+
+<!-- NEW PAPERS -->
+<section id="view-new">
+<section class="panel">
+<h2>Check the council website for new papers</h2>
+<div class="bar" style="align-items:flex-end">
+<div><label class="field">Committees</label><details class="picker" id="checkpicker"></details></div>
+<div><label class="field" for="checkperiod">Meetings</label><select id="checkperiod">
+<option value="recent">Upcoming and last 30 days</option><option value="90">Upcoming and last 3 months</option><option value="year">This year and upcoming</option><option value="custom">Choose dates…</option><option value="all">Every meeting (slow)</option></select></div>
+<div id="checkdates" class="bar" hidden><div><label class="field" for="checkfrom">From</label><input type="date" id="checkfrom"></div><div><label class="field" for="checkto">To</label><input type="date" id="checkto"></div></div>
+<label class="bar" style="gap:6px"><input type="checkbox" id="checkdownload" checked> Download new papers into my archive</label>
+<button id="checknow">Check now</button>
+</div>
+<p class="muted" id="checkestimate"></p>
+<details style="margin-top:8px"><summary>Automatic checks</summary>
+<div class="bar" style="margin-top:8px"><label for="autohours">While this app is open, check</label><select id="autohours"><option value="0">never</option><option value="3">every 3 hours</option><option value="6">every 6 hours</option><option value="12">every 12 hours</option><option value="24">once a day</option></select>
+<label class="bar" style="gap:6px"><input type="checkbox" id="autodownload" checked> and download what's found</label></div>
+<p class="muted">Automatic checks cover all committees, upcoming meetings and the last 30 days. They only run while the launcher window is open.</p></details>
+</section>
+
+<section class="panel">
+<div class="bar"><h2 style="margin:0" id="newtitle">Recently found papers</h2><span class="spacer"></span>
+<label class="field" for="newwindow" style="margin:0">Show</label><select id="newwindow"><option value="latest">Found by the latest check</option><option value="7d">Found in the last 7 days</option><option value="30d">Found in the last 30 days</option><option value="90d">Found in the last 90 days</option></select>
+<details class="picker" id="newpicker"></details></div>
+<div class="bar" style="margin-top:8px"><label class="bar" style="gap:6px"><input type="checkbox" id="newunsaved"> Only papers not yet in my archive</label>
+<label class="bar" style="gap:6px"><input type="checkbox" id="newbaseline"> Include older meetings checked for the first time</label></div>
+<p id="newsummary" class="muted"></p>
+<div class="bar"><button class="secondary" id="newselectall">Select all shown</button><button class="secondary" id="newselectmissing">Select those not in my archive</button></div>
+<div id="newlist"></div>
+<p class="muted" style="margin-top:12px">“Appeared between” uses this archive's own checks: the link was absent at one check and present at the next. The council's exact publication time is not recorded on the page.</p>
+</section>
+</section>
+
+<!-- BROWSE -->
+<section id="view-browse" hidden><div class="browse">
+<section class="panel"><label class="field" for="committeefilter">Committees</label><input type="search" id="committeefilter" placeholder="Filter committees" style="width:100%"><div id="committeelist"></div></section>
+<section class="panel">
+<div class="bar"><h2 style="margin:0" id="browsetitle">All committees</h2><span class="spacer"></span>
+<label class="field" for="browseperiod" style="margin:0">Meetings</label><select id="browseperiod"></select></div>
+<p class="muted" id="browsesummary"></p>
+<div class="bar" style="margin:8px 0"><label class="bar" style="gap:6px"><input type="checkbox" id="meetingall"> Select all shown</label><span class="spacer"></span>
+<button class="secondary" id="browsecheck">Check for new papers</button><button class="secondary" id="browsefetch">Add missing papers to archive</button><button id="browsezip">Save as ZIP</button></div>
+<p class="muted">Save as ZIP first gets any papers not yet in your archive from the council, then your browser saves the ZIP to your Downloads folder.</p>
+<div id="meetinglist"></div><button class="secondary" id="meetingmore" hidden>Show more meetings</button>
+</section></div></section>
+
+<!-- SEARCH -->
+<section id="view-search" hidden>
+<form class="panel" id="searchform">
+<div class="bar" style="align-items:flex-end"><div class="grow"><label class="field" for="q">Search inside saved papers</label><input id="q" placeholder='Try Newton or "Families First"' style="width:100%"></div>
+<div><label class="field">Committees</label><details class="picker" id="searchpicker"></details></div><button type="submit">Search</button></div>
+<div class="bar" style="margin-top:10px;align-items:flex-end"><div><label class="field" for="searchfrom">Meeting date from</label><input type="date" id="searchfrom"></div><div><label class="field" for="searchto">to</label><input type="date" id="searchto"></div>
+<div><label class="field" for="searchsort">Order</label><select id="searchsort"><option value="relevance">Best match</option><option value="newest">Newest meetings first</option><option value="oldest">Oldest meetings first</option></select></div>
+<label class="bar" style="gap:6px"><input type="checkbox" id="issues"> Only papers needing attention</label></div>
+<p class="muted">Put phrases in quotation marks. Separate words must occur on the same page. Date filters leave out papers with no known meeting date. Search covers papers already in your archive; use New papers to fetch more.</p>
+</form>
+<section class="panel"><div class="bar"><h2 style="margin:0" id="searchsummary">Your archive</h2><span class="spacer"></span><button class="secondary" id="searchselect">Select all on this page</button></div>
+<div id="results"></div>
+<div class="bar" style="margin-top:12px"><button class="secondary" id="prev">Previous</button><span id="pageinfo"></span><button class="secondary" id="next">Next</button></div></section>
+</section>
+
+<!-- TOOLS -->
+<section id="view-tools" hidden><div class="tools">
+<section class="panel"><h2>Refresh the full meeting list</h2><p>Normal checks read each committee's current page. This reads every older year too, to find meetings missing from the list. It can take 10 minutes or more. No papers are downloaded.</p><button id="rescan" class="secondary">Refresh full meeting list</button></section>
+<section class="panel"><h2>Add copied PDFs to search</h2><p>Downloads are added to search automatically. Use this if you copied PDFs into the archive folder yourself.</p><button id="index" class="secondary">Add saved PDFs to search</button></section>
+<section class="panel"><h2>Check the website connection</h2><p>Reads up to 6 listing pages and 3 meeting pages to confirm the council site responds. Nothing is downloaded.</p><button id="sitecheck" class="secondary">Check website</button></section>
+<section class="panel"><h2>Read scanned pages (OCR)</h2><p id="ocrstatus" class="muted"></p><p>Recognises words in page images so scanned papers become searchable. Runs locally; originals are untouched. You can stop and resume.</p><div class="bar"><button id="runocr" class="secondary">Read scanned pages / retry failures</button></div>
+<details><summary>Recent OCR results</summary><div id="ocrresults"></div></details>
+<details><summary>Windows setup</summary><p>Install Tesseract with English language data, then restart the app. For a custom install, set TESSERACT_CMD to the full path of tesseract.exe. See START-HERE.md. <a href="https://tesseract-ocr.github.io/tessdoc/Installation.html" target="_blank" rel="noopener">Tesseract installation</a></p></details></section>
+<section class="panel wide"><h2>Check history</h2><div class="tablewrap"><table><thead><tr><th>Started</th><th>What</th><th>Scope</th><th>Meetings read</th><th>New papers</th><th>Downloaded</th><th>Problems</th></tr></thead><tbody id="runs"></tbody></table></div></section>
+<section class="panel wide"><h2>Unavailable papers and meeting pages</h2><p class="muted">These could not be retrieved at the last attempt. A refusal or empty response does not prove a paper doesn't exist.</p>
+<div class="bar"><button id="retrypapers">Try these papers again</button><button id="retrymeetings" class="secondary">Re-check these meeting pages</button><button id="copyproblems" class="secondary">Copy list</button><button id="saveproblems" class="secondary">Save list (.txt)</button></div>
+<p id="problemstatus" role="status"></p><textarea id="problemcopy" hidden readonly style="width:100%;height:200px" aria-label="Copyable problem report"></textarea><div id="problemitems"></div></section>
+<section class="panel wide"><h2>Replaced PDFs</h2><p class="muted">When a council replaces a PDF at the same address, the older copy is kept.</p><div id="replacements"></div></section>
+</div></section>
+<p class="muted">Files stay on your computer. Keep the launcher window open while using the archive.</p>
+</main>
+
+<div id="tray" hidden role="region" aria-label="Selected papers"><div class="inner">
+<strong id="traycount"></strong><span id="traynote"></span><span class="spacer"></span>
+<button id="trayfetch">Download to archive</button><button id="trayzip">Save as ZIP</button>
+<button class="secondary" id="trayshow">Show</button><button class="secondary" id="trayclear">Clear</button>
+<div id="traylist" hidden></div></div></div>
+
+<dialog id="adddialog"><form id="addform" method="dialog">
+<h2>Set up a council archive</h2>
+<label class="field" for="preset">Council</label><select id="preset"><option value="bristol">Bristol City Council</option><option value="birmingham">Birmingham City Council</option><option value="custom">Another council</option></select>
+<div id="custom" hidden><div class="bar" style="margin-top:8px"><div class="grow"><label class="field" for="newname">Council name</label><input id="newname" placeholder="Leeds City Council"></div><div><label class="field" for="newid">Short identifier</label><input id="newid" placeholder="leeds"></div><div><label class="field" for="newsystem">Website system</label><select id="newsystem"><option value="moderngov">ModernGov</option><option value="cmis">CMIS</option></select></div></div>
+<label class="field" for="newurl">Committee homepage URL</label><input id="newurl" type="url" placeholder="https://…"></div>
+<label class="field" for="newroot" style="margin-top:8px">Archive folder (optional)</label><input id="newroot" placeholder="Leave blank for a new archive, or paste an existing toolkit folder">
+<p class="muted">For Bristol, paste your existing local-authority-tools folder to reuse it. For a new council, leave blank.</p>
+<p id="adderror" class="warning" hidden></p>
+<div class="bar end"><button type="button" class="secondary" id="canceladd">Cancel</button><button type="submit" id="saveadd">Save council</button></div>
+</form></dialog>
+
+<script>
+const TOKEN='__TOKEN__';
+const $=id=>document.getElementById(id);
+const picked=new Map(); // key -> {key,url,doc_id,title}
+let committeesData=[],status0={},wasRunning=false,view='new';
+
+// ---------- helpers ----------
+function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined&&text!==null)e.textContent=text;if(cls)e.className=cls;return e}
+function link(label,url,newTab=true){const a=el('a',label);a.href=url;if(newTab){a.target='_blank';a.rel='noopener'}return a}
+function council(){return $('council').value}
+function qs(params){const u=new URLSearchParams({council:council()});for(const[k,v]of Object.entries(params||{})){if(Array.isArray(v))v.forEach(x=>u.append(k,x));else if(v!==undefined&&v!==null&&v!=='')u.append(k,v)}return u}
+async function get(path,params){const r=await fetch(path+'?'+qs(params));const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}
+async function post(action,body){const r=await fetch('/api/'+action,{method:'POST',headers:{'X-Archive-Token':TOKEN,'Content-Type':'application/json'},body:JSON.stringify({council:council(),...body})});const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed');return d}
+async function job(action,body){$('notice').textContent='';try{await post(action,body);await status()}catch(e){$('notice').textContent=e.message}}
+function isoDay(d){return d.toISOString().slice(0,10)}
+function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return isoDay(d)}
+function when(s){if(!s)return'';const d=new Date(s);return d.toLocaleString(undefined,{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+function ago(s){if(!s)return'never';const m=Math.round((Date.now()-new Date(s))/60000);if(m<1)return'just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<48)return h+' hour'+(h>1?'s':'')+' ago';return Math.round(h/24)+' days ago'}
+function plural(n,word){return n.toLocaleString()+' '+word+(n===1?'':'s')}
+function cleanTitle(t){t=t||'Council paper';const m=t.match(/\s*PDF\s+([\d.]+\s*[KMG]B)\s*$/i);let name=m?t.slice(0,m.index):t;name=name.replace(/\s+,/g,',').replace(/[\s,]+$/,'');return{name:name||t,size:m?m[1]:''}}
+function pdfUrl(id,page,download){return '/pdf/'+encodeURIComponent(council())+'/'+id+(download?'?download=1':'')+(page?'#page='+page:'')}
+
+// ---------- committee picker ----------
+class Picker{
+  constructor(id,onchange){this.root=$(id);this.chosen=new Set();this.names=[];this.onchange=onchange;
+    this.root.innerHTML='<summary></summary><div class="body"><input type="search" placeholder="Filter committees" aria-label="Filter committees"><div class="list"></div><div class="bar"><button type="button" class="secondary">All committees</button><button type="button">Done</button></div></div>';
+    this.filter=this.root.querySelector('input');this.list=this.root.querySelector('.list');
+    this.filter.oninput=()=>this.render();this.root.addEventListener('toggle',()=>{if(this.root.open)this.filter.focus()});
+    const[all,done]=this.root.querySelectorAll('.bar button');all.onclick=()=>{this.chosen.clear();this.render();this.changed()};done.onclick=()=>{this.root.open=false};
+    this.summary();}
+  set(names){this.names=names;for(const c of[...this.chosen])if(!names.includes(c))this.chosen.delete(c);this.render();this.summary()}
+  get(){return[...this.chosen]}
+  summary(){const n=this.chosen.size;this.root.querySelector('summary').textContent=!n?'All committees':n===1?[...this.chosen][0]||'Committee unknown':n+' committees'}
+  changed(){this.summary();if(this.onchange)this.onchange()}
+  render(){const f=this.filter.value.toLowerCase();this.list.replaceChildren();for(const name of this.names){if(f&&!name.toLowerCase().includes(f))continue;const l=el('label'),b=document.createElement('input');b.type='checkbox';b.checked=this.chosen.has(name);b.onchange=()=>{b.checked?this.chosen.add(name):this.chosen.delete(name);this.changed()};l.append(b,document.createTextNode(name||'Committee unknown'));this.list.append(l)}}
+}
+document.addEventListener('click',e=>{for(const p of document.querySelectorAll('details.picker[open]'))if(!p.contains(e.target))p.open=false});
+const checkPicker=new Picker('checkpicker',updateEstimate),newPicker=new Picker('newpicker',()=>loadNews()),searchPicker=new Picker('searchpicker');
+
+// ---------- selection tray ----------
+function paperKey(p){return p.url||('doc:'+p.doc_id)}
+function selectPaper(p,on){const k=paperKey(p);if(on)picked.set(k,{key:k,url:p.url||'',doc_id:p.doc_id||null,title:cleanTitle(p.title).name});else picked.delete(k)}
+function paperBox(p){const b=document.createElement('input');b.type='checkbox';b.dataset.key=paperKey(p);b.checked=picked.has(b.dataset.key);b.setAttribute('aria-label','Select '+cleanTitle(p.title).name);
+  if(picked.has(b.dataset.key)&&p.doc_id)picked.get(b.dataset.key).doc_id=p.doc_id;
+  b.onchange=()=>{selectPaper(p,b.checked);refreshTray()};return b}
+function refreshTray(){
+  const items=[...picked.values()],missing=items.filter(i=>!i.doc_id&&i.url),saved=items.filter(i=>i.doc_id);
+  $('tray').hidden=!items.length;
+  $('traycount').textContent=plural(items.length,'paper')+' selected';
+  $('traynote').textContent=missing.length?missing.length+' not in your archive yet':'all in your archive';
+  $('trayfetch').hidden=!missing.length;$('trayfetch').textContent='Download '+missing.length+' to archive';
+  $('trayzip').disabled=!saved.length;$('trayzip').textContent=saved.length?'Save '+saved.length+' as ZIP':'Save as ZIP';
+  for(const b of document.querySelectorAll('input[data-key]'))b.checked=picked.has(b.dataset.key);
+  if(!$('traylist').hidden)renderTrayList();
+}
+function renderTrayList(){$('traylist').replaceChildren();for(const i of picked.values()){const row=el('p'),rm=el('button','Remove','link');rm.onclick=()=>{picked.delete(i.key);refreshTray()};row.append(el('span',i.title+(i.doc_id?'':' (not in archive yet)')),rm);$('traylist').append(row)}}
+$('trayshow').onclick=()=>{$('traylist').hidden=!$('traylist').hidden;$('trayshow').textContent=$('traylist').hidden?'Show':'Hide';refreshTray()};
+$('trayclear').onclick=()=>{picked.clear();refreshTray()};
+$('trayfetch').onclick=()=>{const urls=[...picked.values()].filter(i=>!i.doc_id&&i.url).map(i=>i.url);job('fetch',{urls,download:true})};
+async function saveZip(ids,name){
+  ids=[...new Set(ids)];
+  if(!ids.length){$('notice').textContent='None of these papers are in your archive yet.';return}
+  try{
+    for(let start=0;start<ids.length;start+=500){
+      const part=ids.slice(start,start+500),suffix=ids.length>500?' part '+(start/500+1):'';
+      const d=await post('exportcheck',{ids:part});
+      const frame=document.createElement('iframe');frame.name='zip'+Date.now()+start;frame.hidden=true;document.body.append(frame);setTimeout(()=>frame.remove(),600000);
+      const f=document.createElement('form');f.method='POST';f.action='/api/export';f.target=frame.name;
+      for(const[k,v]of Object.entries({token:TOKEN,council:council(),ids:part.join(','),name:name?name+suffix:''})){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;f.append(i)}
+      document.body.append(f);f.submit();f.remove();
+      $('notice').textContent='';$('jobdetail').textContent='Preparing a ZIP of '+plural(d.files,'paper')+' ('+Math.round(d.bytes/1048576)+' MB). Your browser will save it to your Downloads folder when ready.';
+    }
+  }catch(e){$('notice').textContent=e.message}
+}
+$('trayzip').onclick=()=>saveZip([...picked.values()].filter(i=>i.doc_id).map(i=>i.doc_id));
+
+// Meetings: fetch anything missing from the council first, then save every paper as a ZIP.
+let zipAfterJob=null;
+function zipName(meetings){
+  if(meetings.length===1){const m=meetingsShown.find(x=>x.url===meetings[0]);if(m)return[m.committee,m.date||m.label].filter(Boolean).join(' ')}
+  return(browseCommittee||'Council')+' '+meetings.length+' meetings'}
+async function zipMeetings(meetings,name){
+  let ids=[],missing=0;
+  for(let i=0;i<meetings.length;i+=100){const papers=await get('/api/papers',{meeting:meetings.slice(i,i+100)});for(const p of papers){if(p.doc_id)ids.push(p.doc_id);else missing++}}
+  if(missing)$('notice').textContent=plural(missing,'paper')+' could not be downloaded from the council and are not in the ZIP. See Tools › Unavailable papers.';
+  await saveZip(ids,name);
+}
+async function downloadMeetings(meetings){
+  const name=zipName(meetings);
+  $('notice').textContent='';
+  try{zipAfterJob={meetings,name};await post('fetch',{meetings,download:true});$('jobdetail').textContent='Getting any missing papers from the council first; the ZIP will follow.';await status()}
+  catch(e){zipAfterJob=null;$('notice').textContent=e.message}
+}
+async function refreshPickedIds(){const urls=[...picked.values()].filter(i=>!i.doc_id&&i.url).map(i=>i.url);if(!urls.length)return;try{const d=await post('lookup',{urls});for(const[u,id]of Object.entries(d))if(id&&picked.has(u))picked.get(u).doc_id=id;refreshTray()}catch(e){}}
+
+// ---------- paper rows (shared) ----------
+function appeared(p){
+  if(p.previous_check)return 'Appeared between '+when(p.previous_check)+' and '+when(p.first_seen);
+  if(p.first_seen)return 'First seen '+when(p.first_seen)+(p.is_new===false?' (already present at first check)':'');
+  return '';
+}
+function paperRow(p,{showMeeting=false}={}){
+  const row=el('div',undefined,'paper'),t=cleanTitle(p.title),saved=!!(p.doc_id||p.downloaded);
+  const main=el('div');const title=el('div',undefined,'title');title.append(document.createTextNode(t.name+' '));
+  if(p.previous_check)title.append(el('span','New','pill new'),document.createTextNode(' '));
+  title.append(el('span',saved?'In archive':'Not downloaded','pill '+(saved?'saved':'missing')));
+  main.append(title);
+  const meta=[t.size,showMeeting?[p.committee,p.meeting].filter(Boolean).join(' · '):'',appeared(p)].filter(Boolean).join(' · ');
+  if(meta)main.append(el('div',meta,'meta'));
+  const actions=el('div',undefined,'actions');
+  if(p.doc_id){actions.append(link('Open',pdfUrl(p.doc_id)),link('Save PDF',pdfUrl(p.doc_id,0,true),false))}
+  if(p.url)actions.append(link('Council site',p.url));
+  row.append(paperBox(p),main,actions);return row;
+}
+
+// ---------- status bar ----------
+async function status(){
+  if(!council())return;
+  try{
+    const d=await get('/api/status');status0=d;
+    const mine=d.job_council===council(),last=d.messages.at(-1)||'';
+    $('archivestats').textContent=d.documents.toLocaleString()+' papers in archive';
+    $('root').textContent='Archive folder: '+d.root;
+    const p=d.progress||{};
+    if(d.running){
+      const name=[...$('council').options].find(o=>o.value===d.job_council)?.textContent||d.job_council;
+      $('jobtext').textContent=d.label+(d.auto?' (automatic)':'')+' · '+name+(d.stop_requested?' · stopping after the current step…':'');
+      $('jobprogress').hidden=false;
+      if(p.total){$('jobprogress').max=Math.max(1,p.total);$('jobprogress').value=p.completed||0}else $('jobprogress').removeAttribute('value');
+      let detail=p.total?(p.phase||'Progress')+': '+(p.completed||0)+' of '+p.total+(p.current?' · '+p.current:''):last.replace(/^\S+\s+/,'');
+      if(d.started)detail+=' · '+Math.floor((Date.now()/1000-d.started)/60)+' min elapsed';
+      $('jobdetail').textContent=detail;
+    }else{
+      $('jobprogress').hidden=true;
+      const r=d.latest_check;
+      $('jobtext').textContent=r?'Last checked '+ago(r.started)+': '+plural(r.added,'new paper')+(r.baseline?' (+'+r.baseline+' on newly checked meetings)':'')+', '+r.downloaded+' downloaded'+(r.failed?', '+plural(r.failed,'problem'):''):'No checks yet. Choose Check now to look for new papers.';
+      if(wasRunning)$('jobdetail').textContent=last.replace(/^\S+\s+/,'');
+    }
+    $('stopjob').hidden=!(d.running&&mine&&['ocr','check','fetch'].includes(d.action));$('stopjob').disabled=d.stop_requested;
+    for(const id of['checknow','browsecheck','browsefetch','browsezip','trayfetch','rescan','index','sitecheck','runocr','retrypapers','retrymeetings'])$(id).disabled=d.running;for(const b of document.querySelectorAll('.jobbtn'))b.disabled=d.running;
+    const badge=$('newbadge');badge.hidden=!d.new_unsaved;badge.textContent=d.new_unsaved;
+    document.title=(d.new_unsaved?'('+d.new_unsaved+') ':'')+'Council archive';
+    if(document.activeElement!==$('autohours')){$('autohours').value=String(d.auto_check_hours);$('autodownload').checked=d.auto_download}
+    const logText=d.messages.join('\n')||'No activity in this session.',sel=window.getSelection();
+    if($('log').textContent!==logText&&!(sel&&!sel.isCollapsed&&$('log').contains(sel.anchorNode))){$('log').textContent=logText;$('log').scrollTop=$('log').scrollHeight}
+    if(d.running&&d.action==='ocr'&&view==='tools')refreshOCR();
+    if(wasRunning&&!d.running)await afterJob();else if(!d.running)refreshPickedIds();
+    wasRunning=d.running;
+  }catch(e){$('jobtext').textContent='Cannot reach the archive. Check that the launcher window is still open.'}
+}
+async function afterJob(){if(zipAfterJob){const z=zipAfterJob;zipAfterJob=null;await zipMeetings(z.meetings,z.name)}await loadCommittees();await refreshPickedIds();if(view==='new')loadNews();if(view==='browse')loadMeetings();if(view==='search')search();if(view==='tools')loadTools()}
+$('stopjob').onclick=async()=>{try{await post('stop',{council:status0.job_council});await status()}catch(e){$('notice').textContent=e.message}};
+
+// ---------- NEW PAPERS ----------
+function checkRange(){const v=$('checkperiod').value;const y=new Date().getFullYear();
+  if(v==='recent')return{date_from:daysAgo(30),date_to:''};if(v==='90')return{date_from:daysAgo(92),date_to:''};
+  if(v==='year')return{date_from:y+'-01-01',date_to:''};if(v==='custom')return{date_from:$('checkfrom').value,date_to:$('checkto').value};return{date_from:'',date_to:''}}
+async function updateEstimate(){
+  $('checkdates').hidden=$('checkperiod').value!=='custom';
+  if(!council())return;
+  try{const r=checkRange();const d=await get('/api/meetings',{committee:checkPicker.get(),date_from:r.date_from,date_to:r.date_to});
+    const n=d.meetings.length,mins=Math.max(1,Math.round(n*2/60));
+    $('checkestimate').textContent='About '+plural(n,'meeting page')+' to read (roughly '+mins+' min), plus each chosen committee’s current page to spot newly listed meetings.'+(n>300?' That is a lot: narrowing the dates will be much faster.':'');
+  }catch(e){$('checkestimate').textContent=e.message}}
+for(const id of['checkperiod','checkfrom','checkto'])$(id).onchange=updateEstimate;
+$('checknow').onclick=()=>{const r=checkRange();if($('checkperiod').value==='custom'&&!r.date_from&&!r.date_to){$('notice').textContent='Choose a start or end date.';return}
+  job('check',{committees:checkPicker.get(),...r,download:$('checkdownload').checked})};
+async function saveAuto(){try{await post('settings',{auto_check_hours:Number($('autohours').value),auto_download:$('autodownload').checked});$('jobdetail').textContent=$('autohours').value==='0'?'Automatic checks are off.':'Automatic checks saved.'}catch(e){$('notice').textContent=e.message}}
+$('autohours').onchange=saveAuto;$('autodownload').onchange=saveAuto;
+
+let newsShown=[];
+async function loadNews(){
+  if(!council())return;const key=council();
+  try{
+    const d=await get('/api/news',{window:$('newwindow').value,committee:newPicker.get(),unsaved:$('newunsaved').checked?'1':'',baseline:$('newbaseline').checked?'1':''});
+    if(key!==council())return;
+    newsShown=d.papers;const list=$('newlist');list.replaceChildren();
+    const w=$('newwindow').value;
+    if(w==='latest'&&!d.run){$('newsummary').textContent='No checks yet. Use Check now above, or show the last 30 days.';return}
+    const missing=d.papers.filter(p=>!(p.doc_id||p.downloaded)).length;
+    $('newsummary').textContent=(w==='latest'?'Check started '+when(d.run.started)+' ('+d.run.scope+'). ':'')+plural(d.total,'paper')+' shown'+(d.total>d.papers.length?' (first '+d.papers.length+')':'')+', '+missing+' not yet in your archive.'+(d.hidden?' '+plural(d.hidden,'paper')+' already present when an older meeting was first checked are hidden.':'');
+    if(!d.papers.length){list.append(el('p',w==='latest'?'The latest check found nothing new. Try a longer time window.':'Nothing found in this period.','muted'));return}
+    const groups=new Map();for(const p of d.papers){if(!groups.has(p.meeting_url))groups.set(p.meeting_url,[]);groups.get(p.meeting_url).push(p)}
+    for(const[url,papers]of groups){
+      const g=el('div',undefined,'group'),h=el('div',undefined,'grouphead'),all=document.createElement('input');all.type='checkbox';all.setAttribute('aria-label','Select all papers for this meeting');
+      all.onchange=()=>{for(const p of papers)selectPaper(p,all.checked);refreshTray()};
+      h.append(all,el('h3',papers[0].committee),el('span',papers[0].meeting,'muted'),link('Meeting page',url));
+      g.append(h);for(const p of papers)g.append(paperRow(p));list.append(g);
+    }
+  }catch(e){$('newsummary').textContent=e.message}
+}
+for(const id of['newwindow','newunsaved','newbaseline'])$(id).onchange=loadNews;
+$('newselectall').onclick=()=>{for(const p of newsShown)selectPaper(p,true);refreshTray()};
+$('newselectmissing').onclick=()=>{for(const p of newsShown)if(!(p.doc_id||p.downloaded))selectPaper(p,true);refreshTray()};
+
+// ---------- BROWSE ----------
+let browseCommittee=null,meetingsShown=[],meetingLimit=100;const pickedMeetings=new Set();
+async function loadCommittees(){
+  if(!council())return;
+  try{committeesData=await get('/api/committees');const names=committeesData.map(c=>c.name);checkPicker.set(names);newPicker.set(names);
+    searchPicker.set([...new Set([...(status0.committees||[]),...names.filter(Boolean)])].sort((a,b)=>a.localeCompare(b)));
+    renderCommittees();updateEstimate();
+  }catch(e){$('notice').textContent=e.message}
+}
+function renderCommittees(){
+  const f=$('committeefilter').value.toLowerCase(),list=$('committeelist');list.replaceChildren();
+  const total=committeesData.reduce((n,c)=>n+c.meetings,0);
+  const all=el('button',undefined,'committee');all.append(document.createTextNode('All committees'),el('small',plural(total,'meeting')));
+  all.setAttribute('aria-current',String(browseCommittee===null));all.onclick=()=>{browseCommittee=null;pickedMeetings.clear();renderCommittees();loadMeetings()};list.append(all);
+  for(const c of committeesData){if(f&&!c.name.toLowerCase().includes(f))continue;
+    const b=el('button',undefined,'committee');b.append(document.createTextNode(c.name||'Committee unknown'),el('small',plural(c.meetings,'meeting')+(c.upcoming?' · '+c.upcoming+' upcoming':'')+' · '+c.saved+'/'+c.papers+' papers saved'+(c.last_checked?' · checked '+ago(c.last_checked):'')));
+    b.setAttribute('aria-current',String(browseCommittee===c.name));b.onclick=()=>{browseCommittee=c.name;pickedMeetings.clear();meetingLimit=100;renderCommittees();loadMeetings()};list.append(b)}
+}
+$('committeefilter').oninput=renderCommittees;
+function daysAhead(n){const d=new Date();d.setDate(d.getDate()+n);return isoDay(d)}
+function browseRange(){const v=$('browseperiod').value,today=isoDay(new Date()),y=new Date().getFullYear();
+  if(v==='recent')return{date_from:daysAgo(365),date_to:''};
+  if(v==='next30')return{date_from:today,date_to:daysAhead(30)};
+  if(v==='next90')return{date_from:today,date_to:daysAhead(90)};
+  if(v==='thisyear')return{date_from:today,date_to:y+'-12-31'};
+  if(v==='upcoming')return{date_from:today,date_to:''};
+  if(v==='all')return{date_from:'',date_to:''};
+  return{date_from:v+'-01-01',date_to:v+'-12-31'}}
+function fillPeriods(){const s=$('browseperiod'),keep=s.value||'recent',y=new Date().getFullYear();
+  const upcoming=document.createElement('optgroup');upcoming.label='Upcoming';
+  upcoming.append(new Option('Next 30 days','next30'),new Option('Next 3 months','next90'),new Option('Rest of '+y,'thisyear'),new Option('All upcoming','upcoming'));
+  const years=document.createElement('optgroup');years.label='By year';for(let i=y+2;i>=2005;i--)years.append(new Option(String(i),String(i)));
+  s.replaceChildren(new Option('Upcoming and last 12 months','recent'),upcoming,new Option('All dates','all'),years);s.value=keep}
+$('browseperiod').onchange=()=>{pickedMeetings.clear();meetingLimit=100;loadMeetings()};
+async function loadMeetings(){
+  if(!council())return;const key=council();
+  $('browsetitle').textContent=browseCommittee===null?'All committees':browseCommittee||'Committee unknown';
+  try{const d=await get('/api/meetings',{committee:browseCommittee===null?[]:[browseCommittee],...browseRange()});if(key!==council())return;
+    if(['next30','next90','thisyear','upcoming'].includes($('browseperiod').value))d.meetings.reverse();  // soonest first
+    meetingsShown=d.meetings;const today=isoDay(new Date());
+    const papers=d.meetings.reduce((n,m)=>n+m.papers,0),saved=d.meetings.reduce((n,m)=>n+m.saved,0),unchecked=d.meetings.filter(m=>!m.last_checked).length;
+    $('browsesummary').textContent=plural(d.meetings.length,'meeting')+' · '+saved+' of '+plural(papers,'known paper')+' in your archive'+(unchecked?' · '+unchecked+' never checked':'')+(d.unknown_dates?' · '+d.unknown_dates+' with unreadable dates hidden by the date filter':'');
+    const list=$('meetinglist');list.replaceChildren();
+    for(const m of d.meetings.slice(0,meetingLimit)){
+      const item=el('div',undefined,'meeting'),row=el('div',undefined,'row'),box=document.createElement('input');box.type='checkbox';box.checked=pickedMeetings.has(m.url);box.dataset.meeting=m.url;box.setAttribute('aria-label','Select meeting '+m.label);
+      box.onchange=()=>{box.checked?pickedMeetings.add(m.url):pickedMeetings.delete(m.url);meetingButtons()};
+      const info=el('div'),head=el('div');head.append(el('strong',m.label||'Date unknown'));if(m.date&&m.date>=today)head.append(document.createTextNode(' '),el('span','Upcoming','pill upcoming'));
+      if(browseCommittee===null)head.append(el('span',' · '+(m.committee||'Committee unknown'),'muted'));
+      info.append(head,el('div',(!m.last_checked?'Not checked yet':(m.papers?m.saved+' of '+plural(m.papers,'paper')+' in archive':'No papers published yet')+' · checked '+ago(m.last_checked)),'muted'));
+      const acts=el('div',undefined,'bar');const show=el('button','Show papers','secondary'),chk=el('button','Check for new','secondary jobbtn'),dl=el('button','Save as ZIP','jobbtn');
+      chk.onclick=()=>job('check',{meetings:[m.url],download:false});dl.onclick=()=>downloadMeetings([m.url]);
+      chk.disabled=dl.disabled=!!status0.running;
+      const papersBox=el('div',undefined,'papers');papersBox.hidden=true;
+      show.onclick=async()=>{if(!papersBox.hidden){papersBox.hidden=true;show.textContent='Show papers';return}show.textContent='Hide papers';papersBox.hidden=false;await loadMeetingPapers(m,papersBox)};
+      acts.append(show,chk,dl);row.append(box,info,acts);item.append(row,papersBox);list.append(item);
+    }
+    if(!d.meetings.length)list.append(el('p','No meetings in this period. Try All dates, or refresh the meeting list with Check now.','muted'));
+    $('meetingmore').hidden=d.meetings.length<=meetingLimit;$('meetingmore').textContent='Show more ('+(d.meetings.length-meetingLimit)+' more)';
+    meetingButtons();
+  }catch(e){$('browsesummary').textContent=e.message}
+}
+async function loadMeetingPapers(m,box){
+  box.replaceChildren(el('p','Loading…','muted'));
+  try{const papers=await get('/api/papers',{meeting:[m.url]});box.replaceChildren();
+    if(!papers.length){box.append(el('p',m.last_checked?'No papers were linked from this meeting page when it was last checked.':'Not checked yet. Choose Check or Download all to read this meeting page.','muted'));return}
+    const bar=el('div',undefined,'bar'),all=el('button','Select all '+papers.length,'link');all.onclick=()=>{for(const p of papers)selectPaper(p,true);refreshTray()};bar.append(all,link('Meeting page on council site',m.url));box.append(bar);
+    for(const p of papers)box.append(paperRow(p));
+  }catch(e){box.replaceChildren(el('p',e.message,'warning'))}
+}
+$('meetingmore').onclick=()=>{meetingLimit+=200;loadMeetings()};
+$('meetingall').onchange=()=>{for(const m of meetingsShown)$('meetingall').checked?pickedMeetings.add(m.url):pickedMeetings.delete(m.url);for(const b of document.querySelectorAll('input[data-meeting]'))b.checked=pickedMeetings.has(b.dataset.meeting);meetingButtons()};
+function meetingButtons(){const n=pickedMeetings.size,all=meetingsShown.length;
+  $('browsecheck').textContent=n?'Check '+plural(n,'selected meeting'):'Check all '+plural(all,'meeting')+' shown';
+  $('browsefetch').textContent=n?'Add missing papers from '+plural(n,'selected meeting'):'Add missing papers to archive';
+  $('browsezip').textContent=n?'Save '+plural(n,'selected meeting')+' as ZIP':'Save all '+all+' shown as ZIP';
+  $('meetingall').checked=!!all&&meetingsShown.every(m=>pickedMeetings.has(m.url));}
+function browseTargets(){return pickedMeetings.size?[...pickedMeetings]:meetingsShown.map(m=>m.url)}
+function confirmBig(n){return n<=150||confirm('This reads '+n+' meeting pages and may take about '+Math.round(n*2/60)+' minutes. You can stop it at any time. Continue?')}
+$('browsecheck').onclick=()=>{const t=browseTargets();if(t.length&&confirmBig(t.length))job('check',{meetings:t,download:false})};
+$('browsefetch').onclick=()=>{const t=browseTargets();if(t.length&&confirmBig(t.length))job('fetch',{meetings:t,download:true})};
+$('browsezip').onclick=()=>{const t=browseTargets();if(t.length&&confirmBig(t.length))downloadMeetings(t)};
+
+// ---------- SEARCH ----------
+let offset=0,total=0,searchResults=[],searchSeq=0;
+async function search(){
+  if(!council())return;const key=council(),seq=++searchSeq;
+  try{const d=await get('/api/search',{q:$('q').value,committee:searchPicker.get(),offset,issues:$('issues').checked?'1':'0',date_from:$('searchfrom').value,date_to:$('searchto').value,sort:$('searchsort').value});
+    if(key!==council()||seq!==searchSeq)return;
+    searchResults=d.results;total=d.total;$('searchsummary').textContent=total.toLocaleString()+' '+($('q').value.trim()?'matching pages':'papers');
+    const box=$('results');box.replaceChildren();
+    for(const r of d.results){const p={url:r.url,doc_id:r.id,title:r.title};const card=el('article',undefined,'result'),row=el('div',undefined,'paper');
+      const main=el('div');const t=cleanTitle(r.title);main.append(el('div',t.name,'title'),el('div',[r.committee,r.meeting,t.size,'PDF page '+r.page].filter(Boolean).join(' · '),'meta'));
+      if(r.ocr)main.append(el('p','Text read by OCR: check against the original.','muted'));
+      if(r.extract)main.append(el('p',r.extract,'excerpt'));if(r.warning)main.append(el('p',r.warning,'warning'));
+      const acts=el('div',undefined,'actions');acts.append(link('Open at page '+r.page,pdfUrl(r.id,r.page)),link('Save PDF',pdfUrl(r.id,0,true),false));if(/^https?:\/\//.test(r.url))acts.append(link('Council site',r.url));
+      row.append(paperBox(p),main,acts);card.append(row);box.append(card)}
+    if(!d.results.length)box.append(el('p','No results. Try fewer words or wider filters.','muted'));
+    $('prev').disabled=offset===0;$('next').disabled=offset+30>=total;$('pageinfo').textContent=total?`${offset+1}–${Math.min(offset+30,total)} of ${total.toLocaleString()}`:'';
+  }catch(e){$('notice').textContent=e.message}
+}
+$('searchform').onsubmit=e=>{e.preventDefault();offset=0;search()};
+for(const id of['searchsort','issues','searchfrom','searchto'])$(id).onchange=()=>{offset=0;search()};
+searchPicker.onchange=()=>{offset=0;search()};
+$('prev').onclick=()=>{offset=Math.max(0,offset-30);search()};$('next').onclick=()=>{offset+=30;search()};
+$('searchselect').onclick=()=>{for(const r of searchResults)selectPaper({url:r.url,doc_id:r.id,title:r.title},true);refreshTray()};
+
+// ---------- TOOLS ----------
+$('rescan').onclick=()=>job('rescan');$('index').onclick=()=>job('index');$('sitecheck').onclick=()=>job('sitecheck');$('runocr').onclick=()=>job('ocr');
+let problemRows=[],problemReport='';
+async function loadTools(){await Promise.all([refreshOCR(),loadProblems(),loadRuns(),loadReplacements()])}
+async function loadRuns(){try{const rows=await get('/api/runs');const t=$('runs');t.replaceChildren();
+  for(const r of rows){const tr=el('tr');for(const v of[when(r.started)+(r.auto?' (automatic)':''),r.kind==='fetch'?'Download selected papers':'Check meetings',r.scope,r.meetings,r.added+(r.baseline?' (+'+r.baseline+' first check)':''),r.downloaded,(r.failed||0)+(r.note?' · '+r.note:'')])tr.append(el('td',String(v)));t.append(tr)}
+  if(!rows.length)t.append(Object.assign(el('tr'),{innerHTML:'<td colspan="7">No checks yet.</td>'}))}catch(e){}}
+async function loadProblems(){const key=council();try{problemRows=await get('/api/problems');if(key!==council())return;
+  const name=$('council').selectedOptions[0]?.textContent||key;
+  problemReport=name+': unavailable papers and meeting pages\nList prepared: '+new Date().toLocaleString()+'\n\nThese links failed when last checked. This does not establish that a document does not exist.\n'+problemRows.map((r,i)=>'\n'+(i+1)+'. '+r.title+'\n'+(r.committee?'Committee: '+r.committee+'\n':'')+(r.meeting?'Meeting: '+r.meeting+'\n':'')+'Problem: '+r.category+'\nDetails: '+r.reason+'\nLast failure: '+r.last_failed+'\nSource: '+r.url+'\n'+(r.meeting_url?'Meeting page: '+r.meeting_url+'\n':'')).join('');
+  $('problemstatus').textContent=plural(problemRows.length,'unresolved problem')+'.';const box=$('problemitems');box.replaceChildren();$('problemcopy').hidden=true;
+  for(const r of problemRows){const item=el('article',undefined,'result');item.append(el('h3',cleanTitle(r.title).name),el('p',[r.kind,r.committee,r.meeting].filter(Boolean).join(' · '),'muted'),el('p',r.category+': '+r.reason,'warning'),el('p','Last failed '+when(r.last_failed)+(r.imported?' · imported from an old log':''),'muted'),link('Council link',r.url));box.append(item)}
+  $('retrypapers').hidden=!problemRows.some(r=>r.kind!=='Meeting page');$('retrymeetings').hidden=!problemRows.some(r=>r.kind==='Meeting page');
+}catch(e){$('problemstatus').textContent=e.message}}
+$('retrypapers').onclick=()=>job('fetch',{urls:problemRows.filter(r=>r.kind!=='Meeting page').map(r=>r.url),download:true});
+$('retrymeetings').onclick=()=>job('check',{meetings:problemRows.filter(r=>r.kind==='Meeting page').map(r=>r.url),download:true});
+$('copyproblems').onclick=async()=>{try{await navigator.clipboard.writeText(problemReport);$('problemstatus').textContent='List copied. You can paste it into a message to Democratic Services.'}catch(e){$('problemcopy').value=problemReport;$('problemcopy').hidden=false;$('problemcopy').select();$('problemstatus').textContent='Press Ctrl+C to copy.'}};
+$('saveproblems').onclick=()=>{const blob=new Blob([problemReport],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=council()+'-unavailable-papers-'+isoDay(new Date())+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+async function loadReplacements(){try{const rows=await get('/api/replacements');const box=$('replacements');box.replaceChildren();if(!rows.length)box.append(el('p','None detected.','muted'));
+  for(const r of rows){const item=el('p');item.append(document.createTextNode(when(r.detected)+' · '),link('Council PDF',r.url),el('span',' · previous copy kept at '+r.old_copy,'muted'));box.append(item)}}catch(e){}}
+let ocrSignature='';
+async function refreshOCR(){const key=council();try{const d=await get('/api/ocr');if(key!==council())return;
+  $('ocrstatus').textContent=(d.engine_available?'Tesseract detected. ':'Tesseract not found (see Windows setup). ')+d.pending_pages+' pages waiting; '+d.empty_pages+' pages still without searchable text.';
+  const sig=key+JSON.stringify(d.results);if(sig===ocrSignature)return;ocrSignature=sig;const box=$('ocrresults');box.replaceChildren();
+  for(const r of d.results){const a=el('p');a.append(document.createTextNode(r.title+' · page '+r.page+' · '+({done:'text added',blank:'no words recognised',error:'failed'}[r.status]||r.status)+' '),link('Open',pdfUrl(r.id,r.page)));box.append(a)}}catch(e){$('ocrstatus').textContent=e.message}}
+
+// ---------- views, councils ----------
+function show(v){view=v;for(const b of document.querySelectorAll('nav.tabs button')){if(b.dataset.view===v)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}
+  for(const s of['new','browse','search','tools'])$('view-'+s).hidden=s!==v;
+  try{localStorage.setItem('archive-view',v)}catch(e){}
+  if(v==='new')loadNews();if(v==='browse')loadMeetings();if(v==='search')search();if(v==='tools')loadTools()}
+for(const b of document.querySelectorAll('nav.tabs button'))b.onclick=()=>show(b.dataset.view);
+$('council').onchange=async()=>{picked.clear();pickedMeetings.clear();refreshTray();browseCommittee=null;offset=0;try{localStorage.setItem('archive-council',council())}catch(e){}$('notice').textContent='';await status();await loadCommittees();show(view)};
+async function councils(preferred){const d=await get('/api/councils');$('council').replaceChildren(...d.profiles.map(p=>new Option(p.name,p.id)));
+  if(preferred&&d.profiles.some(p=>p.id===preferred))$('council').value=preferred;
+  if(!d.profiles.length){$('council').append(new Option('Add your first council',''));$('adddialog').showModal();$('jobtext').textContent='No council set up yet.';return}
+  await status();await loadCommittees();
+  let v='new';try{v=localStorage.getItem('archive-view')||'new'}catch(e){}
+  if(v==='new'&&!status0.latest_check)$('newwindow').value='30d';
+  show(['new','browse','search','tools'].includes(v)?v:'new')}
+$('addtoggle').onclick=()=>{$('adderror').hidden=true;$('adddialog').showModal()};$('canceladd').onclick=()=>$('adddialog').close();
+$('preset').onchange=()=>{$('custom').hidden=$('preset').value!=='custom'};
+$('addform').onsubmit=async e=>{e.preventDefault();try{const r=await fetch('/api/add',{method:'POST',headers:{'X-Archive-Token':TOKEN,'Content-Type':'application/json'},body:JSON.stringify({preset:$('preset').value,id:$('newid').value,name:$('newname').value,system:$('newsystem').value,meetings_url:$('newurl').value,root:$('newroot').value.trim().replace(/^"|"$/g,'')})});const d=await r.json();if(!r.ok)throw Error(d.error);
+  $('adddialog').close();$('jobdetail').textContent='Council saved. Use Check now (all dates) or Tools › Refresh full meeting list to build its archive.';await councils(d.id)}catch(err){$('adderror').textContent=err.message;$('adderror').hidden=false}};
+fillPeriods();
+let savedCouncil=null;try{savedCouncil=localStorage.getItem('archive-council')}catch(e){}
+councils(savedCouncil).catch(e=>{$('notice').textContent=e.message});setInterval(status,2500);
+</script></html>
