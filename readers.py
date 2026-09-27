@@ -8,7 +8,8 @@ PRESETS = {
  'birmingham': dict(id='birmingham',name='Birmingham City Council',system='cmis',meetings_url='https://birmingham.cmis.uk.com/birmingham/'),
  'sheffield': dict(id='sheffield',name='Sheffield City Council',system='moderngov',meetings_url='https://democracy.sheffield.gov.uk/ieDocHome.aspx?bcr=1'),
  'gloucester': dict(id='gloucester',name='Gloucester City Council',system='moderngov',meetings_url='https://democracy.gloucester.gov.uk/ieDocHome.aspx?bcr=1'),
- 'gloucestershire': dict(id='gloucestershire',name='Gloucestershire County Council',system='moderngov',meetings_url='https://glostext.gloucestershire.gov.uk/ieDocHome.aspx?bcr=1')
+ 'gloucestershire': dict(id='gloucestershire',name='Gloucestershire County Council',system='moderngov',meetings_url='https://glostext.gloucestershire.gov.uk/ieDocHome.aspx?bcr=1'),
+ 'lambeth': dict(id='lambeth',name='Lambeth Council',system='moderngov',meetings_url='https://moderngov.lambeth.gov.uk/mgListCommittees.aspx?bcr=1')
 }
 
 class Links(HTMLParser):
