@@ -7,7 +7,18 @@ A free Windows tool for council scrutineers. It keeps your own searchable copy o
 - **Search across years.** Find a word or phrase inside thousands of PDFs, across one committee or several, and open the exact page.
 - **Download in bulk.** Save a whole meeting, a committee, or any papers you tick as one ZIP file.
 
-Everything runs on your own computer. Nothing is uploaded and no account is needed. It works with council committee websites that use **ModernGov** or **CMIS**; Bristol and Birmingham are set up already.
+Everything runs on your own computer. Nothing is uploaded and no account is needed. It works with council committee websites that use **ModernGov** or **CMIS**. These councils are built in, so you can pick them from a list:
+
+| Council | System |
+|---|---|
+| Bristol City Council | ModernGov |
+| Sheffield City Council | ModernGov |
+| Gloucester City Council | ModernGov |
+| Gloucestershire County Council | ModernGov |
+| Birmingham City Council | CMIS |
+| Lambeth Council | ModernGov |
+
+Other ModernGov and CMIS councils can be added by pasting their committee homepage address. Some council websites block automated tools (the West of England Combined Authority's does); for those, save papers by hand into committee and date folders and the app will still make them searchable. See [START-HERE.md](START-HERE.md).
 
 ## Getting started
 
