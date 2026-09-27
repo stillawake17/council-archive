@@ -135,6 +135,7 @@ class Archive:
             rel = p.relative_to(self.root).as_posix()
             seen.add(rel)
             m = meta.get(rel, meta.get(p.name, {}))
+            if not m.get('committee'): m = {**m, **folder_meta(rel)}
             st = p.stat()
             stamp = f'{st.st_mtime_ns}:{st.st_size}:' + json.dumps(m, sort_keys=True)
             with self.connect() as db:
@@ -607,6 +608,20 @@ class Archive:
         progress(dict(phase='Downloading papers',total=len(discovered),completed=len(discovered)))
         log(f'Downloads: {counts["new"]} new, {counts["existing"]} already saved, {counts["changed"]} replaced, {counts["failed"]} failed.')
         return counts,paths,stopped
+
+
+def folder_meta(rel):
+    """Committee and meeting date for PDFs saved by hand, from their folders:
+    raw_documents/<Committee>/<meeting date>/paper.pdf, or raw_documents/<Committee>/<date> paper.pdf."""
+    from planning import meeting_date
+    parts = Path(rel).parts
+    if 'raw_documents' not in parts: return {}
+    sub = parts[parts.index('raw_documents')+1:-1]
+    if not sub or sub[0] == 'web_downloads': return {}
+    result = dict(committee=sub[0])
+    for text in list(sub[1:2]) + [Path(rel).stem.replace('_', ' ')]:
+        if meeting_date(text): result['meeting'] = text; break
+    return result
 
 
 def is_news(paper, meeting_date):

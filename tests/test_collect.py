@@ -66,4 +66,11 @@ class CollectTests(unittest.TestCase):
             found=Reader('moderngov').discover(home,fetch,lambda s:None,[],pagination=not quick)
             self.assertEqual(found,{self.m+'7':('Planning Committee','7 Oct 2026')})
             self.assertEqual(calls,[home,det,lst])
+    def test_folder_meta_for_papers_saved_by_hand(self):
+        from archive import folder_meta
+        self.assertEqual(folder_meta('data/raw_documents/Audit Committee/2026-03-23/Agenda.pdf'),dict(committee='Audit Committee',meeting='2026-03-23'))
+        self.assertEqual(folder_meta('data/raw_documents/Audit Committee/23 Mar 2026 Minutes.pdf'),dict(committee='Audit Committee',meeting='23 Mar 2026 Minutes'))
+        self.assertEqual(folder_meta('data/raw_documents/Audit Committee/Minutes.pdf'),dict(committee='Audit Committee'))
+        self.assertEqual(folder_meta('data/raw_documents/web_downloads/x.pdf'),{})
+        self.assertEqual(folder_meta('data/raw_documents/x.pdf'),{})
 if __name__=='__main__':unittest.main()
