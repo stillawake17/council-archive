@@ -202,3 +202,15 @@ Other fixes: database connections are closed after use (this stopped the export 
 Existing archives, search index, OCR results and publication history are kept. A check_runs table is added to search.sqlite3 to record check history. The old download_plan.json is no longer used. The files replaced by this build are kept in backup-before-redesign.
 
 Validation: 13 offline tests (including new ones for meeting selection, new-paper rules and quick discovery) and live checks against a copy of the Bristol archive. A committee check, a single-meeting check that detected newly linked papers, downloading chosen papers, retrying failed papers and ZIP export all worked.
+
+## What a single meeting's ZIP contains
+
+In **Browse**, **Save as ZIP** on a meeting first gets any papers not yet in your archive from the council, then your browser saves one ZIP containing:
+
+- `papers/`: the PDFs, unchanged.
+- `text/`: the text of each PDF, with `=== PAGE n ===` markers that match the PDF page numbers.
+- `all-text.txt`: all the text in one file, in the order the meeting page lists the papers.
+- `meeting.json` and `papers.md`: the committee, meeting date, meeting page address, and for each paper its page count, any text warnings, and when it appeared on the meeting page.
+- `README.txt`: what the files are and what the timings mean.
+
+Papers the council would not supply are still listed, marked as not in the archive. The timings are the app's own observations, as described under "What the publication times mean"; they are not publication dates stated by the council. Pages that are scans have no text until OCR has been run on them.

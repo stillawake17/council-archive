@@ -5,7 +5,7 @@ import argparse, json, secrets, threading, webbrowser, shutil, re, time
 from datetime import datetime, date, timedelta
 from archive import Archive
 from readers import PRESETS
-from exports import pdf_name, disposition, source, bundle
+from exports import pdf_name, disposition, source, bundle, meeting_bundle
 
 TOKEN=secrets.token_urlsafe(32)
 BASE=Path(__file__).parent.resolve()
@@ -209,11 +209,11 @@ class Handler(BaseHTTPRequestHandler):
             body=self.rfile.read(length)
             action=self.path.removeprefix('/api/')
             # ZIP downloads are posted as a form so the browser saves the file itself, however large.
-            form=action=='export' and self.headers.get('Content-Type','').startswith('application/x-www-form-urlencoded')
+            form=action in ('export','meetingzip') and self.headers.get('Content-Type','').startswith('application/x-www-form-urlencoded')
             if form:
                 fields=parse_qs(body.decode())
                 token=fields.get('token',[''])[0]
-                data=dict(council=fields.get('council',[''])[0],name=fields.get('name',[''])[0],ids=[int(x) for x in fields.get('ids',[''])[0].split(',') if x.isdigit()])
+                data=dict(council=fields.get('council',[''])[0],name=fields.get('name',[''])[0],meeting=fields.get('meeting',[''])[0],ids=[int(x) for x in fields.get('ids',[''])[0].split(',') if x.isdigit()])
             else:
                 token=self.headers.get('X-Archive-Token');data=json.loads(body or '{}')
             if token!=TOKEN:return self.respond({'error':'Refresh the page before trying again.'},403)
@@ -229,6 +229,25 @@ class Handler(BaseHTTPRequestHandler):
                 tmp,size=bundle(a,data.get('ids'))
                 name=re.sub(r'[<>:"/\\|?*\x00-\x1f]',' ',str(data.get('name') or ''))[:120].strip(' .') or profiles.get(data['council'],{}).get('name','Council')+' papers '+date.today().isoformat()
                 name+='.zip'
+                with tmp:
+                    self.send_response(200)
+                    self.send_header('Content-Type','application/zip')
+                    self.send_header('Content-Disposition',disposition(name,True))
+                    self.send_header('Content-Length',str(size));self.end_headers()
+                    shutil.copyfileobj(tmp,self.wfile)
+                return
+            if action=='meetingcheck':
+                a=archives.get(data.get('council',''))
+                if not a:raise ValueError('Choose a council first.')
+                papers=a.papers(meeting_urls=[str(data.get('meeting',''))])
+                if not papers:raise ValueError('No papers are recorded for this meeting. Check the meeting for papers first.')
+                return self.respond(dict(papers=len(papers),saved=sum(bool(p['doc_id']) for p in papers)))
+            if action=='meetingzip':
+                a=archives.get(data.get('council',''))
+                if not a:raise ValueError('Choose a council first.')
+                tmp,size,info=meeting_bundle(a,data.get('meeting',''))
+                name=' '.join(x for x in [info['committee'],info['date'] or info['meeting']] if x) or 'Meeting papers'
+                name=re.sub(r'[<>:"/\\|?*\x00-\x1f]',' ',name)[:120].strip(' .')+'.zip'
                 with tmp:
                     self.send_response(200)
                     self.send_header('Content-Type','application/zip')

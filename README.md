@@ -5,7 +5,7 @@ A free Windows tool for council scrutineers. It keeps your own searchable copy o
 - **Keep up with new papers.** One click checks every committee for papers added since last time, or it can check automatically every few hours.
 - **See when papers appeared.** Each paper records the two checks it appeared between, which helps when reports are published late.
 - **Search across years.** Find a word or phrase inside thousands of PDFs, across one committee or several, and open the exact page.
-- **Download in bulk.** Save a whole meeting, a committee, or any papers you tick as one ZIP file.
+- **Download in bulk.** Save a whole meeting, a committee, or any papers you tick as one ZIP file. A single meeting's ZIP also lists when each paper appeared and includes the text of each paper.
 
 Everything runs on your own computer. Nothing is uploaded and no account is needed. It works with council committee websites that use **ModernGov** or **CMIS**. These councils are built in, so you can pick them from a list:
 

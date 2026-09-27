@@ -212,7 +212,7 @@ main>p.muted{text-align:center;margin-top:24px}
 <p class="muted" id="browsesummary"></p>
 <div class="bar" style="margin:8px 0"><label class="bar" style="gap:6px"><input type="checkbox" id="meetingall"> Select all shown</label><span class="spacer"></span>
 <button class="secondary" id="browsecheck">Check for new papers</button><button class="secondary" id="browsefetch">Add missing papers to archive</button><button id="browsezip">Save as ZIP</button></div>
-<p class="muted">Save as ZIP first gets any papers not yet in your archive from the council, then your browser saves the ZIP to your Downloads folder.</p>
+<p class="muted">Save as ZIP first gets any papers not yet in your archive from the council, then your browser saves the ZIP to your Downloads folder. A single meeting's ZIP also lists when each paper appeared and includes the text of each paper.</p>
 <div id="meetinglist"></div><button class="secondary" id="meetingmore" hidden>Show more meetings</button>
 </section></div></section>
 
@@ -346,11 +346,24 @@ let zipAfterJob=null;
 function zipName(meetings){
   if(meetings.length===1){const m=meetingsShown.find(x=>x.url===meetings[0]);if(m)return[m.committee,m.date||m.label].filter(Boolean).join(' ')}
   return(browseCommittee||'Council')+' '+meetings.length+' meetings'}
+// One meeting: the PDFs plus each paper's text and a list of when it appeared (papers.md). Several meetings: PDFs only.
 async function zipMeetings(meetings,name){
+  if(meetings.length===1)return saveMeetingZip(meetings[0]);
   let ids=[],missing=0;
   for(let i=0;i<meetings.length;i+=100){const papers=await get('/api/papers',{meeting:meetings.slice(i,i+100)});for(const p of papers){if(p.doc_id)ids.push(p.doc_id);else missing++}}
   if(missing)$('notice').textContent=plural(missing,'paper')+' could not be downloaded from the council and are not in the ZIP. See Tools › Unavailable papers.';
   await saveZip(ids,name);
+}
+async function saveMeetingZip(meeting){
+  try{
+    const d=await post('meetingcheck',{meeting});
+    const frame=document.createElement('iframe');frame.name='meeting'+Date.now();frame.hidden=true;document.body.append(frame);setTimeout(()=>frame.remove(),600000);
+    const f=document.createElement('form');f.method='POST';f.action='/api/meetingzip';f.target=frame.name;
+    for(const[k,v]of Object.entries({token:TOKEN,council:council(),meeting})){const i=document.createElement('input');i.type='hidden';i.name=k;i.value=v;f.append(i)}
+    document.body.append(f);f.submit();f.remove();
+    $('notice').textContent=d.saved<d.papers?(d.papers-d.saved)+' of '+plural(d.papers,'paper')+' could not be downloaded from the council. The list of papers in the ZIP shows which.':'';
+    $('jobdetail').textContent='Preparing a ZIP of '+plural(d.saved,'paper')+'. Your browser will save it to your Downloads folder when ready.';
+  }catch(e){$('notice').textContent=e.message}
 }
 async function downloadMeetings(meetings){
   const name=zipName(meetings);
