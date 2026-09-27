@@ -47,6 +47,10 @@ class Reader:
         return ('viewcmis_committeedetails' in lo or
                 (('/committee/' in lo or '/committees-old' in lo) and '/ctl/' not in lo and 'venue' not in lo))
 
+    def details(self,url):
+        """ModernGov committee details page, used by some councils (e.g. Lambeth) between the committee list and its meetings."""
+        return self.system=='moderngov' and 'mgcommitteedetails.aspx' in url.lower()
+
     def pagination(self,url,title):
         text=' '.join(title.lower().split())
         return ('changepage=' in url.lower() or text.isdigit() or
@@ -112,13 +116,18 @@ class Reader:
                     # A committee page names the meeting better than a homepage link does.
                     if u not in meetings or (title and not meetings[u][0]): meetings[u]=(title,t)
                     continue
+                if self.details(u):
+                    # Only from the committee list: committee pages also link back to their own details page.
+                    if url==home and u not in visited and not (skip and skip(t)):queue.append((u,t,depth))
+                    continue
                 follow=self.listing(u)
                 if follow and u not in visited:
                     if not pagination and depth+1>(1 if self.system=='moderngov' else 2): continue
                     paged=self.pagination(u,t)
                     if paged and not pagination: continue
-                    # Keep committee name across numbered pagination links.
-                    name=title if paged else (t or title)
+                    # Keep the committee name across pagination and generic "browse meetings" links.
+                    generic=paged or not t or bool(re.search(r'browse meetings|meetings and agendas|for this committee',t,re.I))
+                    name=title if generic and title else (t or title)
                     if skip and skip(name): continue
                     queue.append((u,name,depth+1))
         if queue: failures.append('Discovery stopped at 2,000 pages; some older pages may not have been checked.')

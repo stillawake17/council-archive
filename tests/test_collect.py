@@ -53,4 +53,17 @@ class CollectTests(unittest.TestCase):
         self.a.repair_names()
         self.assertTrue((folder/'abc_Long_title_PDF_2.pdf').is_file())
         self.assertEqual(self.a.unindexed(),['data/raw_documents/web_downloads/abc_Long_title_PDF_2.pdf'])
+    def test_committee_details_pages(self):
+        # Lambeth-style: list -> mgCommitteeDetails -> "Browse meetings" -> meetings.
+        home='https://council.test/mgListCommittees.aspx';det='https://council.test/mgCommitteeDetails.aspx?ID=5'
+        lst='https://council.test/ieListMeetings.aspx?CommitteeId=5'
+        pages={home:[(det,'Planning Committee')],det:[(lst,'Browse meetings and agendas for this committee'),(det,'Planning Committee')],
+               lst:[(self.m+'7','7 Oct 2026'),(det,'Committee details')]}
+        calls=[]
+        def fetch(u):calls.append(u);return pages[u]
+        for quick in (False,True):
+            calls.clear()
+            found=Reader('moderngov').discover(home,fetch,lambda s:None,[],pagination=not quick)
+            self.assertEqual(found,{self.m+'7':('Planning Committee','7 Oct 2026')})
+            self.assertEqual(calls,[home,det,lst])
 if __name__=='__main__':unittest.main()

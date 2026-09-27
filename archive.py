@@ -403,7 +403,7 @@ class Archive:
 
     def site_check(self, log):
         from readers import Reader
-        with self.browser(timeout=15000) as (page,links,allowed):
+        with self.browser(timeout=30000) as (page,links,allowed):
             return Reader(self.profile['system']).check(self.profile['meetings_url'],links,log)
 
     def refresh_meetings(self, log, links, failures, committees=(), full=False):

@@ -260,7 +260,7 @@ main>p.muted{text-align:center;margin-top:24px}
 <div id="custom" hidden><div class="bar" style="margin-top:8px"><div class="grow"><label class="field" for="newname">Council name</label><input id="newname" placeholder="Leeds City Council"></div><div><label class="field" for="newid">Short identifier</label><input id="newid" placeholder="leeds"></div><div><label class="field" for="newsystem">Website system</label><select id="newsystem"><option value="moderngov">ModernGov</option><option value="cmis">CMIS</option></select></div></div>
 <label class="field" for="newurl">Committee homepage URL</label><input id="newurl" type="url" placeholder="https://…"></div>
 <label class="field" for="newroot" style="margin-top:8px">Archive folder (optional)</label><input id="newroot" placeholder="Leave blank for a new archive, or paste an existing toolkit folder">
-<p class="muted">For Bristol, paste your existing local-authority-tools folder to reuse it. For a new council, leave blank.</p>
+<p class="muted">Leave blank to create a new archive folder inside the app folder. To keep it backed up by OneDrive, give each council its own folder there, alongside (not inside) other councils' archives. For Bristol, paste your existing local-authority-tools folder to reuse it.</p>
 <p id="adderror" class="warning" hidden></p>
 <div class="bar end"><button type="button" class="secondary" id="canceladd">Cancel</button><button type="submit" id="saveadd">Save council</button></div>
 </form></dialog>
@@ -608,6 +608,10 @@ async function councils(preferred){const d=await get('/api/councils');$('council
   show(['new','browse','search','tools'].includes(v)?v:'new')}
 $('addtoggle').onclick=()=>{$('adderror').hidden=true;$('adddialog').showModal()};$('canceladd').onclick=()=>$('adddialog').close();
 $('preset').onchange=()=>{$('custom').hidden=$('preset').value!=='custom'};
+const slugify=t=>t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,50);
+$('newname').oninput=()=>{if(!$('newid').dataset.edited)$('newid').value=slugify($('newname').value.replace(/\b(city|borough|district|county|metropolitan)?\s*council\b/ig,''))};
+$('newid').oninput=()=>{$('newid').dataset.edited='1'};
+$('newid').onchange=()=>{$('newid').value=slugify($('newid').value)};
 $('addform').onsubmit=async e=>{e.preventDefault();try{const r=await fetch('/api/add',{method:'POST',headers:{'X-Archive-Token':TOKEN,'Content-Type':'application/json'},body:JSON.stringify({preset:$('preset').value,id:$('newid').value,name:$('newname').value,system:$('newsystem').value,meetings_url:$('newurl').value,root:$('newroot').value.trim().replace(/^"|"$/g,'')})});const d=await r.json();if(!r.ok)throw Error(d.error);
   $('adddialog').close();$('jobdetail').textContent='Council saved. Use Check now (all dates) or Tools › Refresh full meeting list to build its archive.';await councils(d.id)}catch(err){$('adderror').textContent=err.message;$('adderror').hidden=false}};
 fillPeriods();

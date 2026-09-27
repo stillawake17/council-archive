@@ -25,10 +25,15 @@ def progress(info):
 def save():
     tmp=settings.with_suffix('.tmp');tmp.write_text(json.dumps(profiles,indent=2),encoding='utf-8');tmp.replace(settings)
 
+def slug(text):
+    """'Lambeth Council' -> 'lambeth-council'; keeps identifiers valid however they are typed."""
+    return re.sub(r'[^a-z0-9]+','-',str(text).lower()).strip('-')[:50]
+
 def add_profile(data):
     preset=data.get('preset','')
     p=dict(PRESETS[preset]) if preset in PRESETS else {k:str(data.get(k,'')).strip() for k in ['id','name','system','meetings_url']}
-    if not re.fullmatch(r'[a-z][a-z0-9_-]{1,49}',p['id']): raise ValueError('Use a short identifier such as leeds or north-somerset.')
+    p['id']=slug(p['id'] or p['name'])
+    if not re.fullmatch(r'[a-z][a-z0-9_-]{1,49}',p['id']): raise ValueError('Use a short identifier made of letters, such as leeds or north-somerset.')
     if p['id'] in profiles: raise ValueError('This council is already configured.')
     if not p['name'] or p['system'] not in ('cmis','moderngov'): raise ValueError('Enter a name and supported website system.')
     url=urlparse(p['meetings_url'])
@@ -37,8 +42,10 @@ def add_profile(data):
     root=Path(p['root'])
     for other in profiles.values():
         existing=Path(other['root']).resolve()
-        if root==existing or root.is_relative_to(existing) or existing.is_relative_to(root):
-            raise ValueError('Each council needs a separate, non-overlapping archive folder.')
+        if root==existing or root.is_relative_to(existing):
+            raise ValueError(f"That folder is inside {other['name']}'s archive ({existing}). Choose a folder next to it instead, for example {existing.parent/p['id']}, or leave the box blank.")
+        if existing.is_relative_to(root):
+            raise ValueError(f"That folder contains {other['name']}'s archive. Choose a separate folder for {p['name']}, or leave the box blank.")
     marker=root/'data'/'archive_web'/'council-profile.json'
     if marker.exists():
         owner=json.loads(marker.read_text())
