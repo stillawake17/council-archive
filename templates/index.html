@@ -256,7 +256,7 @@ main>p.muted{text-align:center;margin-top:24px}
 
 <dialog id="adddialog"><form id="addform" method="dialog">
 <h2>Set up a council archive</h2>
-<label class="field" for="preset">Council</label><select id="preset"><option value="bristol">Bristol City Council</option><option value="birmingham">Birmingham City Council</option><option value="custom">Another council</option></select>
+<label class="field" for="preset">Council</label><select id="preset"><option value="custom">Another council</option></select>
 <div id="custom" hidden><div class="bar" style="margin-top:8px"><div class="grow"><label class="field" for="newname">Council name</label><input id="newname" placeholder="Leeds City Council"></div><div><label class="field" for="newid">Short identifier</label><input id="newid" placeholder="leeds"></div><div><label class="field" for="newsystem">Website system</label><select id="newsystem"><option value="moderngov">ModernGov</option><option value="cmis">CMIS</option></select></div></div>
 <label class="field" for="newurl">Committee homepage URL</label><input id="newurl" type="url" placeholder="https://…"></div>
 <label class="field" for="newroot" style="margin-top:8px">Archive folder (optional)</label><input id="newroot" placeholder="Leave blank for a new archive, or paste an existing toolkit folder">
@@ -599,7 +599,9 @@ function show(v){view=v;for(const b of document.querySelectorAll('nav.tabs butto
   if(v==='new')loadNews();if(v==='browse')loadMeetings();if(v==='search')search();if(v==='tools')loadTools()}
 for(const b of document.querySelectorAll('nav.tabs button'))b.onclick=()=>show(b.dataset.view);
 $('council').onchange=async()=>{picked.clear();pickedMeetings.clear();refreshTray();browseCommittee=null;offset=0;try{localStorage.setItem('archive-council',council())}catch(e){}$('notice').textContent='';await status();await loadCommittees();show(view)};
-async function councils(preferred){const d=await get('/api/councils');$('council').replaceChildren(...d.profiles.map(p=>new Option(p.name,p.id)));
+async function councils(preferred){const d=await get('/api/councils');
+  const have=new Set(d.profiles.map(p=>p.id)),pick=$('preset');
+  pick.replaceChildren(...d.presets.filter(p=>!have.has(p.id)).map(p=>new Option(p.name,p.id)),new Option('Another council','custom'));$('custom').hidden=pick.value!=='custom';$('council').replaceChildren(...d.profiles.map(p=>new Option(p.name,p.id)));
   if(preferred&&d.profiles.some(p=>p.id===preferred))$('council').value=preferred;
   if(!d.profiles.length){$('council').append(new Option('Add your first council',''));$('adddialog').showModal();$('jobtext').textContent='No council set up yet.';return}
   await status();await loadCommittees();

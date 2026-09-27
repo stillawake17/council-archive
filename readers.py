@@ -5,7 +5,8 @@ import re
 
 PRESETS = {
  'bristol': dict(id='bristol',name='Bristol City Council',system='moderngov',meetings_url='https://democracy.bristol.gov.uk/ieDocHome.aspx?bcr=1'),
- 'birmingham': dict(id='birmingham',name='Birmingham City Council',system='cmis',meetings_url='https://birmingham.cmis.uk.com/birmingham/')
+ 'birmingham': dict(id='birmingham',name='Birmingham City Council',system='cmis',meetings_url='https://birmingham.cmis.uk.com/birmingham/'),
+ 'sheffield': dict(id='sheffield',name='Sheffield City Council',system='moderngov',meetings_url='https://democracy.sheffield.gov.uk/ieDocHome.aspx?bcr=1')
 }
 
 class Links(HTMLParser):
