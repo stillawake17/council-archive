@@ -1,5 +1,5 @@
 """Website-specific discovery, separate from archive and search code."""
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, parse_qsl
 from html.parser import HTMLParser
 import re
 
@@ -38,7 +38,9 @@ class Reader:
         if system not in ('moderngov','cmis'): raise ValueError('Supported systems: ModernGov and CMIS.')
         self.system=system
     def meeting(self,url):
-        return ('ielistdocuments.aspx' in url.lower() if self.system=='moderngov' else '/ctl/viewmeetingpublic/' in url.lower())
+        lo=url.lower()
+        # CeListDocuments is the older ModernGov meeting page, used for meetings before a council's upgrade (Bristol: before 2016).
+        return (('ielistdocuments.aspx' in lo or 'celistdocuments.aspx' in lo) if self.system=='moderngov' else '/ctl/viewmeetingpublic/' in lo)
     def document(self,url):
         return '.pdf' in url.lower() or 'mgconvert2pdf' in url.lower() or (self.system=='cmis' and '/document.ashx?' in url.lower())
     def recognised(self,url,html):
@@ -50,6 +52,15 @@ class Reader:
         if self.system=='moderngov':return 'ielistmeetings.aspx' in lo
         return ('viewcmis_committeedetails' in lo or
                 (('/committee/' in lo or '/committees-old' in lo) and '/ctl/' not in lo and 'venue' not in lo))
+
+    def extra_links(self,html,url):
+        """ModernGov lists a committee's older years only in a drop-down form; turn its options into year pages."""
+        if self.system!='moderngov' or 'ielistmeetings.aspx' not in url.lower():return []
+        q={k.lower():v for k,v in parse_qsl(urlparse(url).query)}
+        cid=q.get('cid') or q.get('committeeid')
+        box=re.search(r'<select[^>]*name="YearSelect"[^>]*>(.*?)</select>',html,re.S|re.I)
+        if not cid or not box:return []
+        return [(urljoin(url,f'ieListMeetings.aspx?CId={cid}&Year={y}'),y) for y in re.findall(r'value="(\d{4})"',box.group(1))]
 
     def details(self,url):
         """ModernGov committee details page, used by some councils (e.g. Lambeth) between the committee list and its meetings."""
@@ -107,13 +118,20 @@ class Reader:
     def discover(self,home,get_links,log,failures,skip=None,pagination=True):
         """Crawl committee listings. pagination=False reads current listing pages only;
         skip(name) leaves out committees that are not wanted."""
-        meetings={}; queue=[(home,'',0)]; visited=set()
-        while queue and len(visited)<2000:
+        meetings={}; queue=[(home,'',0)]; visited=set(); starts={home}
+        if pagination and self.system=='moderngov':
+            # ModernGov links only current committees by default; older ones appear under "All committees".
+            everything=urljoin(home,'ieDocHome.aspx?XXR=0&Year=-1')
+            if everything!=home:queue.append((everything,'',0));starts.add(everything)
+        limit=10000 if pagination else 2000
+        while queue and len(visited)<limit:
             url,title,depth=queue.pop(0)
             if url in visited: continue
             visited.add(url);log(f'Finding meetings: listing page {len(visited)}; {len(meetings)} meeting links found; '+(title or 'Council committee homepage')+' | '+url)
             try: links=get_links(url)
             except Exception as e: failures.append(f'{url}: {e}');continue
+            # Year pages cover everything, so a page that offers them needs no Earlier/Later browsing.
+            years=any(re.search(r'[?&]year=\d{4}',u.lower()) for u,t in links)
             for u,t in links:
                 lo=u.lower()
                 if self.meeting(u):
@@ -122,18 +140,19 @@ class Reader:
                     continue
                 if self.details(u):
                     # Only from the committee list: committee pages also link back to their own details page.
-                    if url==home and u not in visited and not (skip and skip(t)):queue.append((u,t,depth))
+                    if url in starts and u not in visited and not (skip and skip(t)):queue.append((u,t,depth))
                     continue
                 follow=self.listing(u)
                 if follow and u not in visited:
                     if not pagination and depth+1>(1 if self.system=='moderngov' else 2): continue
                     paged=self.pagination(u,t)
                     if paged and not pagination: continue
+                    if paged and years and 'act=' in lo: continue
                     # Keep the committee name across pagination and generic "browse meetings" links.
                     generic=paged or not t or bool(re.search(r'browse meetings|meetings and agendas|for this committee',t,re.I))
                     name=title if generic and title else (t or title)
                     if skip and skip(name): continue
                     queue.append((u,name,depth+1))
-        if queue: failures.append('Discovery stopped at 2,000 pages; some older pages may not have been checked.')
+        if queue: failures.append(f'Discovery stopped at {limit:,} pages; some older pages may not have been checked.')
         if not meetings: raise RuntimeError('No meetings found. Use Check website and confirm the committee homepage and website system.')
         return meetings

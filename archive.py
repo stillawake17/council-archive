@@ -378,7 +378,7 @@ class Archive:
     # ---- Website work: one browser session per job ----
 
     @contextmanager
-    def browser(self, timeout=60000):
+    def browser(self, timeout=60000, delay=.25):
         from playwright.sync_api import sync_playwright
         from readers import Reader, parse_links
         from problems import resolve
@@ -394,10 +394,13 @@ class Archive:
                 def links(url):
                     if not allowed(url): raise ValueError('Council link points outside configured committee site.')
                     response=page.goto(url,wait_until='domcontentloaded',timeout=timeout)
+                    if response and response.status in (403,429):
+                        # Sites can briefly refuse a burst of requests: pause, then try once more.
+                        time.sleep(30); response=page.goto(url,wait_until='domcontentloaded',timeout=timeout)
                     if response and response.status>=400: raise RuntimeError(f'HTTP {response.status}')
-                    html=page.content(); time.sleep(.25)
+                    html=page.content(); time.sleep(delay)
                     if not reader.meeting(page.url):resolve(self,url)
-                    return [(canonical(u),t) for u,t in parse_links(html,page.url) if allowed(u)]
+                    return [(canonical(u),t) for u,t in parse_links(html,page.url)+reader.extra_links(html,page.url) if allowed(u)]
                 yield page,links,allowed
             finally:
                 browser.close()
@@ -445,7 +448,8 @@ class Archive:
     def rescan(self, log, progress=None, should_stop=None):
         from problems import IssueList
         failures=IssueList(self)
-        with self.browser() as (page,links,allowed):
+        # Reads every year of every committee, so go gently on the council's site.
+        with self.browser(delay=1.0) as (page,links,allowed):
             self.refresh_meetings(log,links,failures,full=True)
         for issue in failures:log('Coverage issue: '+issue)
 

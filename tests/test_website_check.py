@@ -45,5 +45,5 @@ class WebsiteCheckTests(unittest.TestCase):
         pages={home:[(first,'Transport Committee')],first:[(older,'Earlier meetings')],older:[(first,'Later meetings'),(meeting,'26 September 2020')]}
         logs=[];failures=[];found=Reader('moderngov').discover(home,pages.__getitem__,logs.append,failures)
         self.assertEqual(found[meeting][0],'Transport Committee')
-        self.assertEqual(len(logs),3);self.assertIn('listing page 3',logs[-1]);self.assertIn('Transport Committee',logs[-1])
+        self.assertEqual(len(logs),4);self.assertIn('listing page 4',logs[-1])  # includes the All committees page;self.assertIn('Transport Committee',logs[-1])
 if __name__=='__main__':unittest.main()

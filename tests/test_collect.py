@@ -57,7 +57,7 @@ class CollectTests(unittest.TestCase):
         # Lambeth-style: list -> mgCommitteeDetails -> "Browse meetings" -> meetings.
         home='https://council.test/mgListCommittees.aspx';det='https://council.test/mgCommitteeDetails.aspx?ID=5'
         lst='https://council.test/ieListMeetings.aspx?CommitteeId=5'
-        pages={home:[(det,'Planning Committee')],det:[(lst,'Browse meetings and agendas for this committee'),(det,'Planning Committee')],
+        pages={'https://council.test/ieDocHome.aspx?XXR=0&Year=-1':[],home:[(det,'Planning Committee')],det:[(lst,'Browse meetings and agendas for this committee'),(det,'Planning Committee')],
                lst:[(self.m+'7','7 Oct 2026'),(det,'Committee details')]}
         calls=[]
         def fetch(u):calls.append(u);return pages[u]
@@ -65,7 +65,8 @@ class CollectTests(unittest.TestCase):
             calls.clear()
             found=Reader('moderngov').discover(home,fetch,lambda s:None,[],pagination=not quick)
             self.assertEqual(found,{self.m+'7':('Planning Committee','7 Oct 2026')})
-            self.assertEqual(calls,[home,det,lst])
+            everything='https://council.test/ieDocHome.aspx?XXR=0&Year=-1'  # full refresh also opens "All committees"
+            self.assertEqual(calls,[home,det,lst] if quick else [home,everything,det,lst])
     def test_folder_meta_for_papers_saved_by_hand(self):
         from archive import folder_meta
         self.assertEqual(folder_meta('data/raw_documents/Audit Committee/2026-03-23/Agenda.pdf'),dict(committee='Audit Committee',meeting='2026-03-23'))
@@ -73,4 +74,30 @@ class CollectTests(unittest.TestCase):
         self.assertEqual(folder_meta('data/raw_documents/Audit Committee/Minutes.pdf'),dict(committee='Audit Committee'))
         self.assertEqual(folder_meta('data/raw_documents/web_downloads/x.pdf'),{})
         self.assertEqual(folder_meta('data/raw_documents/x.pdf'),{})
+    def test_full_refresh_includes_all_committees(self):
+        home='https://council.test/ieDocHome.aspx?bcr=1';everything='https://council.test/ieDocHome.aspx?XXR=0&Year=-1'
+        old='https://council.test/ieListMeetings.aspx?CId=9&Year=-1';later='https://council.test/ieListMeetings.aspx?Act=later&CId=9&D=2015'
+        pages={home:[],everything:[(old,'Old Scrutiny Commission')],old:[(later,'Later meetings')],later:[(self.m+'15','12 Mar 2015')]}
+        found=Reader('moderngov').discover(home,pages.__getitem__,lambda s:None,[],pagination=True)
+        self.assertEqual(found,{self.m+'15':('Old Scrutiny Commission','12 Mar 2015')})
+        calls=[]
+        def fetch(u):calls.append(u);return [(self.m+'1','1 Oct 2026')]
+        Reader('moderngov').discover(home,fetch,lambda s:None,[],pagination=False)
+        self.assertEqual(calls,[home])  # quick checks stay on current committees
+    def test_older_years_and_meeting_format(self):
+        r=Reader('moderngov')
+        self.assertTrue(r.meeting('https://council.test/CeListDocuments.aspx?CommitteeId=134&MeetingId=434&DF=16%2f01%2f2015&Ver=2'))
+        html='<select size="1" id="YearSelect" name="YearSelect"><option value="0"> </option><option value="2014">2014</option><option value="2015">2015</option></select>'
+        lst='https://council.test/ieListMeetings.aspx?CId=134&Year=0'
+        self.assertEqual(r.extra_links(html,lst),[('https://council.test/ieListMeetings.aspx?CId=134&Year=2014','2014'),('https://council.test/ieListMeetings.aspx?CId=134&Year=2015','2015')])
+        self.assertEqual(r.extra_links(html,'https://council.test/ieDocHome.aspx?bcr=1'),[])
+        # Full refresh follows year pages and skips the overlapping Earlier/Later links.
+        home='https://council.test/home';y15='https://council.test/ieListMeetings.aspx?CId=134&Year=2015';older=lst+'&Act=earlier'
+        old_meeting='https://council.test/CeListDocuments.aspx?CommitteeId=134&MeetingId=434'
+        pages={home:[(lst,'Audit Committee')],lst:[(y15,'2015'),(older,'Earlier meetings')],y15:[(old_meeting,'16 Jan 2015 10.30 am')]}
+        calls=[]
+        def fetch(u):calls.append(u);return pages.get(u,[])
+        found=r.discover(home,fetch,lambda s:None,[],pagination=True)
+        self.assertEqual(found,{old_meeting:('Audit Committee','16 Jan 2015 10.30 am')})
+        self.assertNotIn(older,calls)
 if __name__=='__main__':unittest.main()
