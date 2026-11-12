@@ -50,6 +50,10 @@ The Late papers tab compares those times with a deadline of five clear working d
 .venv\Scripts\python.exe -m unittest discover -s tests
 ```
 
+The tests run offline. They include saved examples of each built-in council's pages (`tests/pages`), so a code change cannot quietly break the reading of one council's layout. The examples hold only the links the app uses, with paper names replaced.
+
+Council websites change. To find out whether one has, double-click `Check-Council-Websites.bat`. It reads about 25 pages across the built-in councils and compares them with the saved examples. If a page is reported as changed, the app may be missing meetings or papers for that council.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).

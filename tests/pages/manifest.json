@@ -1,0 +1,290 @@
+{
+ "bristol": {
+  "name": "Bristol City Council",
+  "system": "moderngov",
+  "captured": "2026-11-12",
+  "pages": [
+   {
+    "role": "home",
+    "file": "bristol-home.html",
+    "url": "https://democracy.bristol.gov.uk/ieDocHome.aspx?bcr=1",
+    "base": "https://democracy.bristol.gov.uk/ieDocHome.aspx?bcr=1",
+    "expect": {
+     "listings": 48
+    }
+   },
+   {
+    "role": "listing",
+    "file": "bristol-listing.html",
+    "url": "https://democracy.bristol.gov.uk/ieListMeetings.aspx?CId=656&Year=0",
+    "base": "https://democracy.bristol.gov.uk/ieListMeetings.aspx?CId=656&Year=0",
+    "expect": {
+     "listings": 50,
+     "details": 1,
+     "meetings": 15,
+     "years": 5
+    }
+   },
+   {
+    "role": "meeting",
+    "file": "bristol-meeting.html",
+    "url": "https://democracy.bristol.gov.uk/ieListDocuments.aspx?CId=656&MId=12157&Ver=4",
+    "base": "https://democracy.bristol.gov.uk/ieListDocuments.aspx?CId=656&MId=12157&Ver=4",
+    "expect": {
+     "listings": 2,
+     "details": 1,
+     "meetings": 47,
+     "documents": 13,
+     "full_lists": 1
+    }
+   },
+   {
+    "role": "item",
+    "file": "bristol-item.html",
+    "url": "https://democracy.bristol.gov.uk/mgAi.aspx?ID=46137",
+    "base": "https://democracy.bristol.gov.uk/mgAi.aspx?ID=46137#mgDocuments",
+    "expect": {
+     "listings": 2,
+     "meetings": 2,
+     "documents": 12
+    }
+   },
+   {
+    "role": "old_meeting",
+    "file": "bristol-old_meeting.html",
+    "url": "https://democracy.bristol.gov.uk/CeListDocuments.aspx?CommitteeId=279&DF=14%2F12%2F2015&MeetingId=1396&Ver=2",
+    "base": "https://democracy.bristol.gov.uk/CeListDocuments.aspx?CommitteeId=279&DF=14%2F12%2F2015&MeetingId=1396&Ver=2",
+    "expect": {
+     "listings": 2,
+     "meetings": 48,
+     "documents": 2
+    }
+   }
+  ]
+ },
+ "birmingham": {
+  "name": "Birmingham City Council",
+  "system": "cmis",
+  "captured": "2026-11-12",
+  "pages": [
+   {
+    "role": "home",
+    "file": "birmingham-home.html",
+    "url": "https://birmingham.cmis.uk.com/birmingham/",
+    "base": "https://birmingham.cmis.uk.com/birmingham/",
+    "expect": {
+     "listings": 19
+    }
+   },
+   {
+    "role": "listing",
+    "file": "birmingham-listing.html",
+    "url": "https://birmingham.cmis.uk.com/birmingham/Committee/CityCouncil.aspx",
+    "base": "https://birmingham.cmis.uk.com/birmingham/Committee/CityCouncil.aspx",
+    "expect": {
+     "listings": 24
+    }
+   },
+   {
+    "role": "listing2",
+    "file": "birmingham-listing2.html",
+    "url": "https://birmingham.cmis.uk.com/birmingham/Committee/CityCouncil/tabid/137/ctl/ViewCMIS_CommitteeDetails/mid/524/id/42/Default.aspx",
+    "base": "https://birmingham.cmis.uk.com/birmingham/Committee/CityCouncil/tabid/137/ctl/ViewCMIS_CommitteeDetails/mid/524/id/42/Default.aspx",
+    "expect": {
+     "listings": 53,
+     "meetings": 3
+    }
+   },
+   {
+    "role": "meeting",
+    "file": "birmingham-meeting.html",
+    "url": "https://birmingham.cmis.uk.com/birmingham/Meetings/tabid/70/ctl/ViewMeetingPublic/mid/397/Meeting/13597/Committee/42/Default.aspx",
+    "base": "https://birmingham.cmis.uk.com/birmingham/Meetings/tabid/70/ctl/ViewMeetingPublic/mid/397/Meeting/13597/Committee/42/Default.aspx",
+    "expect": {
+     "listings": 19,
+     "meetings": 1,
+     "documents": 6
+    }
+   }
+  ]
+ },
+ "sheffield": {
+  "name": "Sheffield City Council",
+  "system": "moderngov",
+  "captured": "2026-11-12",
+  "pages": [
+   {
+    "role": "home",
+    "file": "sheffield-home.html",
+    "url": "https://democracy.sheffield.gov.uk/ieDocHome.aspx?bcr=1",
+    "base": "https://democracy.sheffield.gov.uk/ieDocHome.aspx?bcr=1",
+    "expect": {
+     "listings": 34
+    }
+   },
+   {
+    "role": "listing",
+    "file": "sheffield-listing.html",
+    "url": "https://democracy.sheffield.gov.uk/ieListMeetings.aspx?CommitteeId=571&MD=Constitution&bcr=1&info=1",
+    "base": "https://democracy.sheffield.gov.uk/ieListMeetings.aspx?CommitteeId=571&info=1&MD=Constitution&bcr=1",
+    "expect": {
+     "listings": 47,
+     "meetings": 11
+    }
+   },
+   {
+    "role": "meeting",
+    "file": "sheffield-meeting.html",
+    "url": "https://democracy.sheffield.gov.uk/ieListDocuments.aspx?CId=571&Info=1&MId=10508&Ver=4",
+    "base": "https://democracy.sheffield.gov.uk/ieListDocuments.aspx?CId=571&MId=10508&Ver=4&Info=1",
+    "expect": {
+     "listings": 1,
+     "details": 1,
+     "meetings": 46,
+     "documents": 54
+    }
+   }
+  ]
+ },
+ "gloucester": {
+  "name": "Gloucester City Council",
+  "system": "moderngov",
+  "captured": "2026-11-12",
+  "pages": [
+   {
+    "role": "home",
+    "file": "gloucester-home.html",
+    "url": "https://democracy.gloucester.gov.uk/ieDocHome.aspx?bcr=1",
+    "base": "https://democracy.gloucester.gov.uk/ieDocHome.aspx?bcr=1",
+    "expect": {
+     "listings": 15
+    }
+   },
+   {
+    "role": "listing",
+    "file": "gloucester-listing.html",
+    "url": "https://democracy.gloucester.gov.uk/ieListMeetings.aspx?CId=564&MD=constitution&Year=0&bcr=1&info=1",
+    "base": "https://democracy.gloucester.gov.uk/ieListMeetings.aspx?CId=564&Year=0&info=1&MD=constitution&bcr=1",
+    "expect": {
+     "listings": 45,
+     "meetings": 1
+    }
+   },
+   {
+    "role": "meeting",
+    "file": "gloucester-meeting.html",
+    "url": "https://democracy.gloucester.gov.uk/ieListDocuments.aspx?CId=564&Info=1&MId=7001&Ver=4",
+    "base": "https://democracy.gloucester.gov.uk/ieListDocuments.aspx?CId=564&MId=7001&Ver=4&Info=1",
+    "expect": {
+     "listings": 1,
+     "details": 1,
+     "meetings": 44,
+     "documents": 53
+    }
+   }
+  ]
+ },
+ "gloucestershire": {
+  "name": "Gloucestershire County Council",
+  "system": "moderngov",
+  "captured": "2026-11-12",
+  "pages": [
+   {
+    "role": "home",
+    "file": "gloucestershire-home.html",
+    "url": "https://glostext.gloucestershire.gov.uk/ieDocHome.aspx?bcr=1",
+    "base": "https://glostext.gloucestershire.gov.uk/ieDocHome.aspx?bcr=1",
+    "expect": {
+     "listings": 33
+    }
+   },
+   {
+    "role": "listing",
+    "file": "gloucestershire-listing.html",
+    "url": "https://glostext.gloucestershire.gov.uk/ieListMeetings.aspx?CId=774&Year=0",
+    "base": "https://glostext.gloucestershire.gov.uk/ieListMeetings.aspx?CId=774&Year=0",
+    "expect": {
+     "listings": 2,
+     "details": 1,
+     "meetings": 15,
+     "years": 9
+    }
+   },
+   {
+    "role": "meeting",
+    "file": "gloucestershire-meeting.html",
+    "url": "https://glostext.gloucestershire.gov.uk/ieListDocuments.aspx?CId=774&MId=12079&Ver=4",
+    "base": "https://glostext.gloucestershire.gov.uk/ieListDocuments.aspx?CId=774&MId=12079&Ver=4",
+    "expect": {
+     "listings": 1,
+     "details": 1,
+     "documents": 6
+    }
+   }
+  ]
+ },
+ "lambeth": {
+  "name": "Lambeth Council",
+  "system": "moderngov",
+  "captured": "2026-11-12",
+  "pages": [
+   {
+    "role": "home",
+    "file": "lambeth-home.html",
+    "url": "https://moderngov.lambeth.gov.uk/mgListCommittees.aspx?bcr=1",
+    "base": "https://moderngov.lambeth.gov.uk/mgListCommittees.aspx?bcr=1",
+    "expect": {
+     "listings": 1,
+     "details": 25
+    }
+   },
+   {
+    "role": "details",
+    "file": "lambeth-details.html",
+    "url": "https://moderngov.lambeth.gov.uk/mgCommitteeDetails.aspx?ID=142",
+    "base": "https://moderngov.lambeth.gov.uk/mgCommitteeDetails.aspx?ID=142",
+    "expect": {
+     "listings": 2,
+     "details": 45
+    }
+   },
+   {
+    "role": "listing",
+    "file": "lambeth-listing.html",
+    "url": "https://moderngov.lambeth.gov.uk/ieListMeetings.aspx?CommitteeId=142",
+    "base": "https://moderngov.lambeth.gov.uk/ieListMeetings.aspx?CommitteeId=142",
+    "expect": {
+     "listings": 48,
+     "details": 2,
+     "meetings": 15,
+     "years": 29
+    }
+   },
+   {
+    "role": "meeting",
+    "file": "lambeth-meeting.html",
+    "url": "https://moderngov.lambeth.gov.uk/ieListDocuments.aspx?CId=142&MId=18978&Ver=4",
+    "base": "https://moderngov.lambeth.gov.uk/ieListDocuments.aspx?CId=142&MId=18978&Ver=4",
+    "expect": {
+     "listings": 2,
+     "details": 2,
+     "meetings": 45,
+     "documents": 26,
+     "full_lists": 1
+    }
+   },
+   {
+    "role": "item",
+    "file": "lambeth-item.html",
+    "url": "https://moderngov.lambeth.gov.uk/mgAi.aspx?ID=68518",
+    "base": "https://moderngov.lambeth.gov.uk/mgAi.aspx?ID=68518#mgDocuments",
+    "expect": {
+     "listings": 2,
+     "details": 1,
+     "meetings": 2,
+     "documents": 8
+    }
+   }
+  ]
+ }
+}
