@@ -1,5 +1,5 @@
 """Website-specific discovery, separate from archive and search code."""
-from urllib.parse import urlparse, urljoin, parse_qsl
+from urllib.parse import urlparse, urljoin, urldefrag, parse_qsl
 from html.parser import HTMLParser
 import re
 
@@ -26,7 +26,8 @@ def parse_links(html,base):
     p=Links();p.feed(html)
     result=[]
     for href,text in p.links:
-        u=urljoin(base,href)
+        # Drop '#...' anchors: they never change which page is fetched, and Python versions differ on empty ones.
+        u=urldefrag(urljoin(base,href))[0]
         if urlparse(u).scheme not in ('http','https'): continue
         if urlparse(base).scheme=='https' and urlparse(u).hostname==urlparse(base).hostname:
             u=re.sub(r'^http:', 'https:',u)

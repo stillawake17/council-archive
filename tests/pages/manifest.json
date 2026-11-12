@@ -128,7 +128,7 @@
     "url": "https://democracy.sheffield.gov.uk/ieListMeetings.aspx?CommitteeId=571&MD=Constitution&bcr=1&info=1",
     "base": "https://democracy.sheffield.gov.uk/ieListMeetings.aspx?CommitteeId=571&info=1&MD=Constitution&bcr=1",
     "expect": {
-     "listings": 47,
+     "listings": 46,
      "meetings": 11
     }
    },
