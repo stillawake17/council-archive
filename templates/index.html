@@ -169,7 +169,7 @@ main>p.muted{text-align:center;margin-top:24px}
 <button data-view="new" aria-current="page">New papers<span class="badge" id="newbadge" hidden></span></button>
 <button data-view="browse">Committees &amp; meetings</button>
 <button data-view="search">Search</button>
-<button data-view="late">Late papers</button>
+<button data-view="late">Late &amp; removed</button>
 <button data-view="tools">Tools</button>
 </nav>
 
@@ -248,6 +248,13 @@ main>p.muted{text-align:center;margin-top:24px}
 <div id="latelist"></div>
 <p class="muted" style="margin-top:12px" id="laterule"></p>
 <p class="muted">A late paper is not necessarily unlawful. Councils may add urgent items with the chair's agreement, mark reports “to follow”, or publish supplementary papers such as public forum questions. A paper can only be assessed if the meeting page was checked both before and after it appeared, so this list is not complete. Check your council's constitution for its own rule.</p>
+</section>
+<section class="panel">
+<div class="bar"><h2 style="margin:0">Papers removed from meeting pages</h2><span class="spacer"></span>
+<label class="bar" style="gap:6px"><input type="checkbox" id="removedroutine" checked> Hide routine agenda packs</label></div>
+<p id="removedsummary" class="muted"></p>
+<div id="removedlist"></div>
+<p class="muted" style="margin-top:12px">A paper is listed here when it was on a meeting page at one check and missing at a later one. Papers saved before they were removed stay in your archive. A removal is not proof of wrongdoing: councils replace papers with corrected versions, and normally take the agenda pack off the page after the meeting. Removals are detected from now on, each time a meeting page is checked again.</p>
 </section></section>
 
 <!-- TOOLS -->
@@ -406,6 +413,7 @@ function paperRow(p,{showMeeting=false}={}){
   main.append(title);
   const meta=[t.size,showMeeting?[p.committee,p.meeting].filter(Boolean).join(' · '):'',appeared(p)].filter(Boolean).join(' · ');
   if(meta)main.append(el('div',meta,'meta'));
+  if(p.removed){title.append(document.createTextNode(' '),el('span','Removed','pill late'));main.append(el('div','No longer on the meeting page: missing at the check on '+when(p.removed)+'.','meta'))}
   if(p.watch&&p.watch.length){title.append(document.createTextNode(' '),el('span','Watch-word','pill upcoming'));
     const w=el('div','Mentions ','meta');p.watch.forEach((h,i)=>{if(i)w.append(document.createTextNode(', '));
       w.append(h.page&&p.doc_id?link(h.term+' (page '+h.page+')',pdfUrl(p.doc_id,h.page)):document.createTextNode(h.term+' (in the title)'))});main.append(w)}
@@ -452,7 +460,7 @@ async function status(){
     wasRunning=d.running;
   }catch(e){$('jobtext').textContent='Cannot reach the archive. Check that the launcher window is still open.'}
 }
-async function afterJob(){if(zipAfterJob){const z=zipAfterJob;zipAfterJob=null;await zipMeetings(z.meetings,z.name)}await loadCommittees();await refreshPickedIds();if(view==='new')loadNews();if(view==='browse')loadMeetings();if(view==='search')search();if(view==='late')loadLate();if(view==='tools')loadTools()}
+async function afterJob(){if(zipAfterJob){const z=zipAfterJob;zipAfterJob=null;await zipMeetings(z.meetings,z.name)}await loadCommittees();await refreshPickedIds();if(view==='new')loadNews();if(view==='browse')loadMeetings();if(view==='search')search();if(view==='late'){loadLate();loadRemoved()}if(view==='tools')loadTools()}
 $('stopjob').onclick=async()=>{try{await post('stop',{council:status0.job_council});await status()}catch(e){$('notice').textContent=e.message}};
 
 // ---------- NEW PAPERS ----------
@@ -629,6 +637,20 @@ async function loadLate(){
     if(!lateShown.length)list.append(el('p',d.meetings.length?'No papers were certainly late in this period.':'No late papers found in this period. Papers can only be assessed for meetings checked more than once, so regular or automatic checks build up this evidence.','muted'));
   }catch(e){$('latesummary').textContent=e.message}
 }
+async function loadRemoved(){
+  if(!council())return;const key=council();
+  try{const rows=await get('/api/removals');if(key!==council())return;
+    const hide=$('removedroutine').checked,shown=rows.filter(r=>!(hide&&r.routine)),list=$('removedlist');list.replaceChildren();
+    const routine=rows.filter(r=>r.routine).length;
+    $('removedsummary').textContent=rows.length?plural(rows.length-routine,'paper')+' removed'+(routine?', plus '+plural(routine,'routine agenda pack')+(hide?' (hidden)':''):'')+'.':'';
+    for(const r of shown){const row=paperRow({...r,previous_check:'',first_seen:'',removed:''},{showMeeting:true}),main=row.children[1];
+      main.querySelector('.title').append(document.createTextNode(' '),r.returned?el('span','Listed again','pill saved'):el('span','Removed','pill late'));
+      main.append(el('div','Last listed at the check on '+when(r.last_listed)+'. Missing at the check on '+when(r.missing_since)+'.'+(r.returned?' Listed again at the check on '+when(r.returned)+'.':'')+(r.doc_id?'':' It was not downloaded before it went.'),'meta'));
+      const acts=row.children[2];acts.append(link('Meeting page',r.meeting_url));list.append(row)}
+    if(!shown.length)list.append(el('p',rows.length?'Only routine agenda packs have been removed.':'No removals detected yet. They are picked up each time a meeting page is checked again.','muted'));
+  }catch(e){$('removedsummary').textContent=e.message}
+}
+$('removedroutine').onchange=loadRemoved;
 const latePicker=new Picker('latepicker',()=>loadLate());
 $('lateperiod').onchange=loadLate;$('latecertain').onchange=loadLate;
 $('latecsv').onclick=()=>{const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
@@ -666,7 +688,7 @@ async function refreshOCR(){const key=council();try{const d=await get('/api/ocr'
 function show(v){view=v;for(const b of document.querySelectorAll('nav.tabs button')){if(b.dataset.view===v)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}
   for(const s of['new','browse','search','late','tools'])$('view-'+s).hidden=s!==v;
   try{localStorage.setItem('archive-view',v)}catch(e){}
-  if(v==='new')loadNews();if(v==='browse')loadMeetings();if(v==='search')search();if(v==='late')loadLate();if(v==='tools')loadTools()}
+  if(v==='new')loadNews();if(v==='browse')loadMeetings();if(v==='search')search();if(v==='late'){loadLate();loadRemoved()}if(v==='tools')loadTools()}
 for(const b of document.querySelectorAll('nav.tabs button'))b.onclick=()=>show(b.dataset.view);
 $('council').onchange=async()=>{watchDirty=false;picked.clear();pickedMeetings.clear();refreshTray();browseCommittee=null;offset=0;try{localStorage.setItem('archive-council',council())}catch(e){}$('notice').textContent='';await status();await loadCommittees();show(view)};
 async function councils(preferred){const d=await get('/api/councils');

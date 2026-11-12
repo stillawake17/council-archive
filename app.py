@@ -190,6 +190,7 @@ class Handler(BaseHTTPRequestHandler):
             elif p.path=='/api/late':
                 from late import report
                 self.respond(report(a,q.get('committee',[]),valid_date(one('date_from')),valid_date(one('date_to'))))
+            elif p.path=='/api/removals':self.respond(a.removals())
             elif p.path=='/api/runs':self.respond(a.runs())
             elif p.path=='/api/ocr':
                 import ocr

@@ -13,6 +13,7 @@ REFUSAL_LIMIT = 3     # after this many refusals in a row, leave the rest for a 
 RETRY_LIMIT = 6       # automatic attempts per paper before it is left for you to retry by hand
 FULL_LISTS_FROM = '2026-11-11T00:00:00+00:00'   # release that began reading agenda items' full document lists
 ITEM_TITLE = re.compile(r', item \d')            # how ModernGov titles a paper listed under an agenda item
+AGENDA_PACK = re.compile(r'/documents/g\d+/', re.I)   # ModernGov's generated agenda packs, routinely swapped after a meeting
 POSTPONED = 'Postponed: the council website was refusing downloads. It will be tried again at a later check.'
 
 
@@ -62,6 +63,7 @@ def now():
 # A paper found on a meeting page, joined to its saved copy (if any) and search record (if indexed).
 PAPERS = '''SELECT o.url, o.meeting_url, o.title, o.committee, o.meeting, o.first_seen, o.previous_check,
     dl.url IS NOT NULL AS downloaded,
+    (SELECT r.missing_since FROM removals r WHERE r.url=o.url AND r.meeting_url=o.meeting_url AND r.returned='') AS removed,
     COALESCE((SELECT d.id FROM docs d WHERE d.path=dl.path),(SELECT d.id FROM docs d WHERE d.url=o.url LIMIT 1)) AS doc_id
     FROM observations o LEFT JOIN downloads dl ON dl.url=o.url'''
 
@@ -93,6 +95,8 @@ class Archive:
             CREATE TABLE IF NOT EXISTS check_runs(id INTEGER PRIMARY KEY, started TEXT, finished TEXT,
                 kind TEXT, scope TEXT, auto INTEGER DEFAULT 0, meetings INTEGER DEFAULT 0, added INTEGER DEFAULT 0,
                 baseline INTEGER DEFAULT 0, downloaded INTEGER DEFAULT 0, failed INTEGER DEFAULT 0, note TEXT DEFAULT '');
+            CREATE TABLE IF NOT EXISTS removals(url TEXT, meeting_url TEXT, last_listed TEXT, missing_since TEXT,
+                returned TEXT DEFAULT '', PRIMARY KEY(url, meeting_url));
             CREATE INDEX IF NOT EXISTS observations_meeting ON observations(meeting_url);
             CREATE INDEX IF NOT EXISTS observations_seen ON observations(first_seen);
             CREATE INDEX IF NOT EXISTS docs_url ON docs(url);
@@ -482,10 +486,39 @@ class Archive:
         with self.connect() as db:
             return [dict(r) for r in db.execute('SELECT * FROM observations ORDER BY first_seen DESC LIMIT 500')]
 
-    def record_observation(self, meeting_url, committee, meeting, found, html, checked, item_pages=()):
+    def last_listed(self, meeting_url, urls):
+        """From the saved check history: the last check at which each of these links was on the meeting page."""
+        last={};path=self.work/'page_checks.jsonl';needle=json.dumps(meeting_url)[1:-1]
+        if not path.exists():return last
+        with path.open(encoding='utf-8') as f:
+            for line in f:
+                if needle not in line:continue
+                try:r=json.loads(line)
+                except ValueError:continue
+                if r.get('meeting_url')!=meeting_url:continue
+                present={u for u,_ in r.get('document_links',[])}
+                for u in urls:
+                    if u in present:last[u]=max(last.get(u,''),r['checked'])
+        return last
+
+    def removals(self):
+        """Papers that were on a meeting page and later were not, newest first."""
+        with self.connect() as db:
+            rows=[dict(r) for r in db.execute("""SELECT r.url,r.meeting_url,r.last_listed,r.missing_since,r.returned,
+                o.title,o.committee,o.meeting,o.first_seen,dl.url IS NOT NULL AS downloaded,
+                COALESCE((SELECT d.id FROM docs d WHERE d.path=dl.path),(SELECT d.id FROM docs d WHERE d.url=r.url LIMIT 1)) AS doc_id
+                FROM removals r JOIN observations o ON o.url=r.url AND o.meeting_url=r.meeting_url
+                LEFT JOIN downloads dl ON dl.url=r.url ORDER BY r.missing_since DESC LIMIT 2000""")]
+        for r in rows:
+            r['routine']=bool(AGENDA_PACK.search(r['url']));r['removed']='' if r['returned'] else r['missing_since']
+        return rows
+
+    def record_observation(self, meeting_url, committee, meeting, found, html, checked, item_pages=(), complete=True):
         """Archive the page, then record links. Returns (links first seen now, whether this was the first check).
         item_pages: links found only on agenda items' own pages. If the previous check predates reading those
-        pages, such a link may have been there all along, so no 'appeared between' window is recorded for it."""
+        pages, such a link may have been there all along, so no 'appeared between' window is recorded for it.
+        complete: every page for this meeting was read, so a known link that is absent has really gone from the
+        page. self.removed then holds how many links were newly found missing."""
         folder=self.work/'page_snapshots'/hashlib.sha256(meeting_url.encode()).hexdigest()[:20]
         folder.mkdir(parents=True,exist_ok=True)
         snapshot=folder/(checked.replace(':','-')+'.html')
@@ -498,6 +531,19 @@ class Archive:
                 cur=db.execute('INSERT OR IGNORE INTO observations VALUES(?,?,?,?,?,?,?)',
                     (url,meeting_url,title,committee,meeting,checked,'' if url in item_pages and before<self.full_lists else before))
                 added+=cur.rowcount
+            self.removed=0
+            if old and complete:
+                present={u for u,_ in found}
+                missing={r['url'] for r in db.execute("SELECT url FROM removals WHERE meeting_url=? AND returned=''",(meeting_url,))}
+                gone=[r for r in db.execute('SELECT url,first_seen FROM observations WHERE meeting_url=?',(meeting_url,)).fetchall()
+                      if r['url'] not in present and r['url'] not in missing]
+                if gone:
+                    listed=self.last_listed(meeting_url,[r['url'] for r in gone])
+                    db.executemany('INSERT OR REPLACE INTO removals VALUES(?,?,?,?,?)',
+                        [(r['url'],meeting_url,listed.get(r['url'],r['first_seen']),checked,'') for r in gone])
+                    self.removed=len(gone)
+                for u in missing&present:
+                    db.execute('UPDATE removals SET returned=? WHERE url=? AND meeting_url=?',(checked,u,meeting_url))
             db.execute('INSERT OR REPLACE INTO meeting_checks VALUES(?,?)',(meeting_url,checked))
         with (self.work/'page_checks.jsonl').open('a',encoding='utf-8') as f:
             f.write(json.dumps(dict(meeting_url=meeting_url,checked=checked,
@@ -595,7 +641,7 @@ class Archive:
         reader=Reader(self.profile['system'])
         failures=IssueList(self)
         kind='fetch' if urls else 'check'
-        summary=dict(meetings=0,added=0,baseline=0,downloaded=0,failed=0,postponed=0,note='')
+        summary=dict(meetings=0,added=0,baseline=0,downloaded=0,failed=0,postponed=0,removed=0,note='')
         with self.connect() as db:
             run=db.execute('INSERT INTO check_runs(started,kind,scope,auto) VALUES(?,?,?,?)',(now(),kind,scope,int(auto))).lastrowid
         stopped=False
@@ -625,15 +671,19 @@ class Archive:
                             if not reader.recognised(page.url,html):
                                 raise RuntimeError('Meeting page was not recognised; no publication observation recorded.')
                             # Papers beyond the first few for an agenda item are only on the item's own page.
-                            item_pages=set()
+                            item_pages=set();complete=True
                             for u,t in dict.fromkeys(x for x in listed if reader.more_documents(*x)):
                                 try:
                                     known={x for x,_ in found}
                                     more=[(x,tt) for x,tt in links(u) if reader.document(x) and x not in known]
                                     found+=more;item_pages.update(x for x,_ in more)
-                                except Exception as e:failures.append(f'{u}: {e}')
+                                except Exception as e:
+                                    complete=False;failures.append(f'{u}: {e}')
                             resolve(self,m['url'])
-                            added,first=self.record_observation(m['url'],m['committee'],m['label'],found,html,now(),item_pages)
+                            added,first=self.record_observation(m['url'],m['committee'],m['label'],found,html,now(),item_pages,complete)
+                            if self.removed:
+                                summary['removed']+=self.removed
+                                log(f"{self.removed} paper(s) no longer on the meeting page: {m['committee']} · {m['label']}")
                             summary['meetings']+=1
                             if first:summary['baseline']+=added
                             else:
@@ -679,6 +729,7 @@ class Archive:
         parts=[]
         if summary['meetings']:parts.append(f"checked {summary['meetings']} meeting page(s)")
         if kind=='check':parts.append(f"{summary['added']} new paper(s) since previous checks"+(f", {summary['baseline']} seen for the first time on newly checked meetings" if summary['baseline'] else ''))
+        if summary['removed']:parts.append(f"{summary['removed']} paper(s) no longer on their meeting page (see Late & removed)")
         parts.append(f"{summary['downloaded']} downloaded")
         if summary['postponed']:parts.append(f"{summary['postponed']} postponed because the website was refusing downloads (they will be tried again at a later check)")
         if failures:parts.append(f'{len(failures)} problem(s) – see Tools › Unavailable papers')

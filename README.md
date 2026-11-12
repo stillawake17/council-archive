@@ -6,6 +6,7 @@ A free Windows tool for council scrutineers. It keeps your own searchable copy o
 - **See when papers appeared.** Each paper records the two checks it appeared between, which helps when reports are published late.
 - **Watch for what matters to you.** Set watch-words such as a place, a project or "exempt", and new papers that mention them are flagged with a link to the page.
 - **Spot late papers.** A Late papers tab lists papers that appeared after the usual deadline of five clear working days before the meeting, with the evidence, and saves the list as a spreadsheet.
+- **Notice removed papers.** If a paper disappears from a meeting page, the app records when, and keeps the copy you already saved.
 - **Search across years.** Find a word or phrase inside thousands of PDFs, across one committee or several, and open the exact page.
 - **Download in bulk.** Save a whole meeting, a committee, or any papers you tick as one ZIP file. A single meeting's ZIP also lists when each paper appeared and includes the text of each paper.
 

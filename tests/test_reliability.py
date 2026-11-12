@@ -101,6 +101,28 @@ class WatchWordTests(unittest.TestCase):
             self.assertEqual(len(a.news('7d',watch=['ashton court'],watched=True)['papers']),2)
             self.assertNotIn('watch',a.news('7d')['papers'][0])
 
+class RemovedPaperTests(unittest.TestCase):
+    def test_removed_and_listed_again(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a=Archive(tmp);m='https://council.test/ieListDocuments.aspx?MId=1';x='https://council.test/'
+            A=(x+'documents/s1/a.pdf','Report');B=(x+'documents/s2/b.pdf','Appendix');P=(x+'documents/g9/pack.pdf?T=10','Agenda reports pack')
+            t=lambda d:f'2026-10-{d:02d}T12:00:00+00:00'
+            a.record_observation(m,'Cabinet','20 Oct 2026',[A,B,P],'<html></html>',t(1));self.assertEqual(a.removed,0)
+            a.record_observation(m,'Cabinet','20 Oct 2026',[A,B,P],'<html></html>',t(2))
+            a.record_observation(m,'Cabinet','20 Oct 2026',[A],'<html></html>',t(3),complete=False)
+            self.assertEqual((a.removed,a.removals()),(0,[]))                      # a page could not be read: prove nothing
+            a.record_observation(m,'Cabinet','20 Oct 2026',[A],'<html></html>',t(4));self.assertEqual(a.removed,2)
+            a.record_observation(m,'Cabinet','20 Oct 2026',[A],'<html></html>',t(5));self.assertEqual(a.removed,0)   # not reported twice
+            rows={r['url']:r for r in a.removals()}
+            self.assertEqual((rows[B[0]]['last_listed'],rows[B[0]]['missing_since'],rows[B[0]]['routine']),(t(2),t(4),False))
+            self.assertTrue(rows[P[0]]['routine'])
+            by={p['url']:p['removed'] for p in a.papers()}
+            self.assertEqual((by[A[0]],by[B[0]]),(None,t(4)))
+            a.record_observation(m,'Cabinet','20 Oct 2026',[A,B],'<html></html>',t(6))
+            rows={r['url']:r for r in a.removals()}
+            self.assertEqual((rows[B[0]]['returned'],rows[B[0]]['removed']),(t(6),''))
+            self.assertIsNone({p['url']:p['removed'] for p in a.papers()}[B[0]])
+
 class DatabaseLocationTests(unittest.TestCase):
     def test_database_moves_out_of_synced_folder_and_is_backed_up(self):
         with tempfile.TemporaryDirectory() as tmp:
