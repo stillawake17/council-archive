@@ -10,7 +10,9 @@ from problems import IssueList,items
 import late
 
 class Response:
-    def __init__(self,status,body=b'%PDF-1.4 test'):self.status=status;self.ok=status<400;self._body=body
+    def __init__(self,status,body=b'%PDF-1.4 test'):
+        self.status=status;self.ok=status<400;self._body=b'<title>Azure WAF</title>' if status==499 else body
+        if status==499:self.status=403   # 499 in a test script stands for a bot-protection challenge page
     def body(self):return self._body
 
 class Page:
@@ -46,6 +48,12 @@ class DownloadTests(unittest.TestCase):
         by={r['url']:r for r in items(self.a)}
         self.assertEqual(by[self.urls[5]]['category'],'Waiting to try again')
         self.assertEqual(by[self.urls[5]]['attempts'],0)
+    def test_bot_protection_challenge_is_not_retried_or_attempted(self):
+        page=Page({u:[499] for u in self.urls})
+        counts,failures=self.run_download(page,self.urls)
+        self.assertEqual(len(page.calls),3)            # one request each, no second attempts, then stop asking
+        self.assertEqual((counts['failed'],counts['postponed'],counts['refused']),(3,3,True))
+        self.assertIn('bot protection',items(self.a)[-1]['reason']+' '.join(r['reason'] for r in items(self.a)))
     def test_retry_list(self):
         m=doc(0)['meeting_url']
         self.a.record_observation(m,'Cabinet','1 Sep 2026',[(u,'Paper') for u in self.urls[:3]],'<html></html>','2026-09-01T10:00:00+00:00')

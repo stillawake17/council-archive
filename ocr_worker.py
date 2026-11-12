@@ -28,7 +28,9 @@ def recognise(pdf_path,page_number):
         if r.returncode:raise RuntimeError(r.stderr.decode('utf-8',errors='replace')[-1500:])
         return r.stdout.decode('utf-8',errors='replace').strip()
 
-if __name__=='__main__':
-    try:result=dict(text=recognise(sys.argv[1],int(sys.argv[2])),error='')
+def main(args):
+    try:result=dict(text=recognise(args[0],int(args[1])),error='')
     except Exception as e:result=dict(text='',error=str(e))
-    Path(sys.argv[3]).write_text(json.dumps(result),encoding='utf-8')
+    Path(args[2]).write_text(json.dumps(result),encoding='utf-8')
+
+if __name__=='__main__':main(sys.argv[1:])

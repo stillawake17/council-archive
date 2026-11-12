@@ -17,6 +17,13 @@ AGENDA_PACK = re.compile(r'/documents/g\d+/', re.I)   # ModernGov's generated ag
 POSTPONED = 'Postponed: the council website was refusing downloads. It will be tried again at a later check.'
 
 
+def bot_check(response):
+    """True when a refusal is the website's bot protection asking for a browser check (for example Azure WAF or Cloudflare)."""
+    try:text=response.body()[:4000].lower()
+    except Exception:return False
+    return any(mark in text for mark in (b'azure waf',b'js challenge',b'just a moment',b'cf-chl',b'captcha'))
+
+
 def synced_folder(path):
     """True inside a cloud-synced folder. Sync tools can corrupt a database that is rewritten while they copy it."""
     path = Path(path)
@@ -807,7 +814,11 @@ class Archive:
                     room=max(20,min(100,240-len(str(out))-26))
                     target=out/(hashlib.sha256(url.encode()).hexdigest()[:20]+'_'+fn[:-4][:room]+'.pdf')
                     response=page.request.get(url,timeout=60000)
-                    if response.status in (403,429):
+                    challenged=response.status in (403,429) and bot_check(response)
+                    if challenged:
+                        # Waiting cannot help here, and the app does not attempt the website's browser check.
+                        refusals+=1
+                    elif response.status in (403,429):
                         # Usually a sign of too many requests: slow down, wait, and try this paper once more.
                         log(f'The council website refused a download. Waiting {REFUSAL_WAIT} seconds before trying again…')
                         pause=min(pause*2,4)
@@ -816,8 +827,10 @@ class Archive:
                             time.sleep(1)
                         response=page.request.get(url,timeout=60000)
                         refusals=refusals+1 if response.status in (403,429) else 0
-                        if refusals==REFUSAL_LIMIT:log('The council website is still refusing downloads. The remaining papers will be tried again at a later check.')
                     elif response.ok:refusals=0
+                    if response.status in (403,429) and refusals==REFUSAL_LIMIT:
+                        log('The council website is still refusing downloads. The remaining papers will be tried again at a later check.')
+                    if challenged: raise RuntimeError(f"HTTP {response.status}: the website's bot protection asked for a browser check, which this app does not attempt")
                     if not response.ok: raise RuntimeError(f'HTTP {response.status}')
                     body=response.body()
                     if not body: raise RuntimeError('Empty response from council document link')

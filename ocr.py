@@ -66,7 +66,7 @@ def run(a,log,progress=None,should_stop=None):
         with tempfile.TemporaryDirectory(prefix='council-ocr-result-') as tmp:
             out=Path(tmp)/'result.json'
             try:
-                proc=subprocess.run([sys.executable,str(Path(__file__).with_name('ocr_worker.py')),str(path),str(page),str(out)],capture_output=True,timeout=150)
+                proc=subprocess.run(([sys.executable,'--ocr-worker'] if getattr(sys,'frozen',False) else [sys.executable,str(Path(__file__).with_name('ocr_worker.py'))])+[str(path),str(page),str(out)],capture_output=True,timeout=150)
                 if proc.returncode or not out.exists():raise RuntimeError('OCR worker failed: '+proc.stderr.decode(errors='replace')[-700:])
                 result=json.loads(out.read_text());text=result['text'];error=result['error']
             except Exception as e:text='';error=str(e)

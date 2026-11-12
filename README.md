@@ -25,6 +25,17 @@ Other ModernGov and CMIS councils can be added by pasting their committee homepa
 
 ## Getting started
 
+### The easy way: the installer
+
+1. Go to the [latest release](https://github.com/stillawake17/council-archive/releases/latest) and download `Council-Archive-Setup-….exe`.
+2. Run it. Windows may show a blue "Windows protected your PC" box, because the installer is not signed with a paid certificate. Choose **More info**, then **Run anyway**.
+3. Open **Council Archive** from the Start menu or the desktop shortcut. The app opens in your browser. Keep its window open while you use it.
+4. Add your council, then go to **Tools → Refresh full meeting list**.
+
+The installer needs no administrator rights and includes everything the app needs, except the optional Tesseract program for reading scanned pages. Your papers are kept in `Documents\Council Archive` and are never removed by uninstalling or updating. To update, download and run the newest installer.
+
+### From the source code
+
 1. Install [Python](https://www.python.org/downloads/) 3.10 or newer, ticking "Add Python to PATH".
 2. Download this repository: click the green **Code** button above, then **Download ZIP**, and unzip it.
 3. Double-click `Setup-Windows.bat` (once only; needs an internet connection).
@@ -43,6 +54,10 @@ The Late papers tab compares those times with a deadline of five clear working d
 
 - If a council website starts refusing downloads, the app slows down, stops asking after three refusals in a row, and tries those papers again at later checks.
 - If your archive folder is inside OneDrive, Dropbox, Google Drive or iCloud, the search database is kept outside it (in `%LOCALAPPDATA%\CouncilArchive`), because sync tools can corrupt a database that is in use. A backup copy is saved into the archive folder once a day while the app is open, and is restored automatically on a new computer.
+
+## Building the installer
+
+Pushing a tag such as `v1.0.0` (matching the `VERSION` file) makes GitHub build the installer and attach it to a release. The recipes are in `packaging/` and `.github/workflows/release.yml`.
 
 ## Running the tests
 

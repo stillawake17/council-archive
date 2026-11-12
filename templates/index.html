@@ -271,7 +271,7 @@ main>p.muted{text-align:center;margin-top:24px}
 <p id="problemstatus" role="status"></p><textarea id="problemcopy" hidden readonly style="width:100%;height:200px" aria-label="Copyable problem report"></textarea><div id="problemitems"></div></section>
 <section class="panel wide"><h2>Replaced PDFs</h2><p class="muted">When a council replaces a PDF at the same address, the older copy is kept.</p><div id="replacements"></div></section>
 </div></section>
-<p class="muted">Files stay on your computer. Keep the launcher window open while using the archive.</p>
+<p class="muted">Files stay on your computer. Keep the launcher window open while using the archive. <span id="version"></span></p>
 </main>
 
 <div id="tray" hidden role="region" aria-label="Selected papers"><div class="inner">
@@ -286,7 +286,7 @@ main>p.muted{text-align:center;margin-top:24px}
 <div id="custom" hidden><div class="bar" style="margin-top:8px"><div class="grow"><label class="field" for="newname">Council name</label><input id="newname" placeholder="Leeds City Council"></div><div><label class="field" for="newid">Short identifier</label><input id="newid" placeholder="leeds"></div><div><label class="field" for="newsystem">Website system</label><select id="newsystem"><option value="moderngov">ModernGov</option><option value="cmis">CMIS</option></select></div></div>
 <label class="field" for="newurl">Committee homepage URL</label><input id="newurl" type="url" placeholder="https://…"></div>
 <label class="field" for="newroot" style="margin-top:8px">Archive folder (optional)</label><input id="newroot" placeholder="Leave blank for a new archive, or paste an existing toolkit folder">
-<p class="muted">Leave blank to create a new archive folder inside the app folder. To keep it backed up by OneDrive, give each council its own folder there, alongside (not inside) other councils' archives. For Bristol, paste your existing local-authority-tools folder to reuse it.</p>
+<p class="muted">Leave blank to create a new archive folder in <span id="defaultroot">the app folder</span>. To keep it backed up by OneDrive, give each council its own folder there, alongside (not inside) other councils' archives. For Bristol, paste your existing local-authority-tools folder to reuse it.</p>
 <p id="adderror" class="warning" hidden></p>
 <div class="bar end"><button type="button" class="secondary" id="canceladd">Cancel</button><button type="submit" id="saveadd">Save council</button></div>
 </form></dialog>
@@ -692,6 +692,7 @@ function show(v){view=v;for(const b of document.querySelectorAll('nav.tabs butto
 for(const b of document.querySelectorAll('nav.tabs button'))b.onclick=()=>show(b.dataset.view);
 $('council').onchange=async()=>{watchDirty=false;picked.clear();pickedMeetings.clear();refreshTray();browseCommittee=null;offset=0;try{localStorage.setItem('archive-council',council())}catch(e){}$('notice').textContent='';await status();await loadCommittees();show(view)};
 async function councils(preferred){const d=await get('/api/councils');
+  $('version').textContent=d.version&&d.version!=='development'?'Version '+d.version+'.':'';if(d.default_root)$('defaultroot').textContent=d.default_root;
   const have=new Set(d.profiles.map(p=>p.id)),pick=$('preset');
   pick.replaceChildren(...d.presets.filter(p=>!have.has(p.id)).map(p=>new Option(p.name,p.id)),new Option('Another council','custom'));$('custom').hidden=pick.value!=='custom';$('council').replaceChildren(...d.profiles.map(p=>new Option(p.name,p.id)));
   if(preferred&&d.profiles.some(p=>p.id===preferred))$('council').value=preferred;

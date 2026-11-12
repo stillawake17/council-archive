@@ -1,15 +1,33 @@
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 from pathlib import Path
-import argparse, json, secrets, threading, webbrowser, shutil, re, time
+import argparse, json, os, secrets, sys, threading, webbrowser, shutil, re, time
 from datetime import datetime, date, timedelta
-from archive import Archive
+
+# Installed (packaged) copies cannot write beside the program, and carry their own browser.
+FROZEN=getattr(sys,'frozen',False)
+if FROZEN:os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH','0')
+from archive import Archive, local_store
 from readers import PRESETS
 from exports import pdf_name, disposition, source, bundle, meeting_bundle
 
 TOKEN=secrets.token_urlsafe(32)
-BASE=Path(__file__).parent.resolve()
-settings=BASE/'councils-local.json'
+BASE=Path(getattr(sys,'_MEIPASS','') or Path(__file__).parent).resolve()   # program files: templates, version
+
+def documents_folder():
+    """The user's real Documents folder, which Windows may have moved into OneDrive."""
+    try:
+        import ctypes
+        buffer=ctypes.create_unicode_buffer(260)
+        if ctypes.windll.shell32.SHGetFolderPathW(None,5,None,0,buffer)==0 and buffer.value:return Path(buffer.value)
+    except Exception:pass
+    return Path.home()/'Documents'
+
+# Run from source, everything stays in the app folder. Installed, settings and archives live in the user's own folders.
+HOME=Path(os.environ.get('COUNCIL_ARCHIVE_HOME') or (local_store() if FROZEN else BASE))
+ARCHIVES=documents_folder()/'Council Archive' if FROZEN else BASE/'archives'
+VERSION=(BASE/'VERSION').read_text(encoding='utf-8').strip() if (BASE/'VERSION').exists() else 'development'
+settings=HOME/'councils-local.json'
 profiles={}; archives={}
 state={'running':False,'council':'','messages':[]}
 lock=threading.Lock()
@@ -23,6 +41,7 @@ def progress(info):
 
 
 def save():
+    HOME.mkdir(parents=True,exist_ok=True)
     tmp=settings.with_suffix('.tmp');tmp.write_text(json.dumps(profiles,indent=2),encoding='utf-8');tmp.replace(settings)
 
 def slug(text):
@@ -38,7 +57,7 @@ def add_profile(data):
     if not p['name'] or p['system'] not in ('cmis','moderngov'): raise ValueError('Enter a name and supported website system.')
     url=urlparse(p['meetings_url'])
     if url.scheme not in ('http','https') or not url.hostname or url.username or url.password: raise ValueError('Enter a valid council committee website address.')
-    p['root']=str(Path(data.get('root') or BASE/'archives'/p['id']).expanduser().resolve())
+    p['root']=str(Path(data.get('root') or ARCHIVES/p['id']).expanduser().resolve())
     root=Path(p['root'])
     for other in profiles.values():
         existing=Path(other['root']).resolve()
@@ -166,7 +185,7 @@ class Handler(BaseHTTPRequestHandler):
                 body=(BASE/'templates/index.html').read_text(encoding='utf-8').replace('__TOKEN__',TOKEN).encode()
                 self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Cache-Control','no-store')
                 self.end_headers();self.wfile.write(body);return
-            if p.path=='/api/councils':return self.respond({'profiles':list(profiles.values()),'presets':list(PRESETS.values())})
+            if p.path=='/api/councils':return self.respond({'profiles':list(profiles.values()),'presets':list(PRESETS.values()),'version':VERSION,'default_root':str(ARCHIVES)})
             key=one('council')
             if p.path.startswith('/pdf/'):
                 parts=p.path.split('/')
@@ -302,24 +321,37 @@ class Handler(BaseHTTPRequestHandler):
             self.respond({'started':True})
         except Exception as e:self.respond({'error':str(e)},400)
 
+class Server(ThreadingHTTPServer):
+    allow_reuse_address=False   # on Windows, address reuse would let a second copy share the port unnoticed
+
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--root');parser.add_argument('--port',type=int,default=8765);parser.add_argument('--no-browser',action='store_true')
     args=parser.parse_args()
     # Bind first: a second launcher must not rewrite configuration while another runs.
-    server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
+    try:server=Server(('127.0.0.1',args.port),Handler)
+    except OSError:
+        # Already running: show the existing window's page instead of failing.
+        print('Council Archive is already running. Opening it in your browser.')
+        if not args.no_browser:webbrowser.open(f'http://127.0.0.1:{args.port}')
+        time.sleep(3);return
     if settings.exists():
         profiles.update(json.loads(settings.read_text(encoding='utf-8')))
         for key,p in profiles.items():archives[key]=Archive(p['root'],p)
     if not profiles:
-        old=BASE/'settings.json'
+        old=HOME/'settings.json'
         root=args.root or (json.loads(old.read_text())['root'] if old.exists() else '')
         if root:add_profile({'preset':'bristol','root':root})
     threading.Thread(target=auto_checker,daemon=True).start()
     url=f'http://127.0.0.1:{server.server_port}'
-    print('Council archive: '+url+'\nKeep this window open. Press Ctrl+C to stop.')
+    print(f'Council Archive {VERSION}: {url}\nKeep this window open while you use the archive. Close it to stop.')
     if not args.no_browser:webbrowser.open(url)
     try:server.serve_forever()
     except KeyboardInterrupt:pass
     finally:server.server_close()
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    if len(sys.argv)>1 and sys.argv[1]=='--ocr-worker':
+        # The packaged program runs each OCR page in a separate copy of itself.
+        import ocr_worker
+        ocr_worker.main(sys.argv[2:])
+    else:main()
