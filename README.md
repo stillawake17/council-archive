@@ -4,6 +4,7 @@ A free Windows tool for council scrutineers. It keeps your own searchable copy o
 
 - **Keep up with new papers.** One click checks every committee for papers added since last time, or it can check automatically every few hours.
 - **See when papers appeared.** Each paper records the two checks it appeared between, which helps when reports are published late.
+- **Spot late papers.** A Late papers tab lists papers that appeared after the usual deadline of five clear working days before the meeting, with the evidence, and saves the list as a spreadsheet.
 - **Search across years.** Find a word or phrase inside thousands of PDFs, across one committee or several, and open the exact page.
 - **Download in bulk.** Save a whole meeting, a committee, or any papers you tick as one ZIP file. A single meeting's ZIP also lists when each paper appeared and includes the text of each paper.
 
@@ -32,7 +33,14 @@ Full instructions, including OCR for scanned papers and how the publication time
 
 ## What the publication times mean
 
-The app records its own checks of each meeting page. "Appeared between A and B" means a paper's link was absent at check A and present at check B. The first check of a meeting is only a baseline, and a failed check proves nothing. The app keeps a copy of every meeting page it reads, but it does not work out legal deadlines or decide whether a rule was broken.
+The app records its own checks of each meeting page. "Appeared between A and B" means a paper's link was absent at check A and present at check B. The first check of a meeting is only a baseline, and a failed check proves nothing. The app keeps a copy of every meeting page it reads.
+
+The Late papers tab compares those times with a deadline of five clear working days before each meeting (weekends and England and Wales bank holidays are not counted). "Late" means a check made after the deadline did not find the paper, and a later check before the meeting did. The app does not decide whether a rule was broken: urgent items, reports marked "to follow" and public forum papers can lawfully arrive later, and your council's constitution may set a different rule.
+
+## Reliability
+
+- If a council website starts refusing downloads, the app slows down, stops asking after three refusals in a row, and tries those papers again at later checks.
+- If your archive folder is inside OneDrive, Dropbox, Google Drive or iCloud, the search database is kept outside it (in `%LOCALAPPDATA%\CouncilArchive`), because sync tools can corrupt a database that is in use. A backup copy is saved into the archive folder once a day while the app is open, and is restored automatically on a new computer.
 
 ## Running the tests
 

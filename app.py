@@ -128,6 +128,13 @@ def auto_checker():
     attempted={}
     while True:
         time.sleep(60)
+        # Once a day, copy each live database back into its archive folder so the sync service backs it up.
+        for key,a in list(archives.items()):
+            with lock:busy=state['running']
+            if busy:break
+            try:
+                if a.backup():print('Backup copy of the search database saved for '+profiles[key]['name'],flush=True)
+            except Exception as e:print('Database backup failed for '+profiles[key]['name']+': '+str(e),flush=True)
         for key,p in list(profiles.items()):
             hours=p.get('auto_check_hours',0)
             if not hours or key not in archives:continue
@@ -169,7 +176,7 @@ class Handler(BaseHTTPRequestHandler):
             if not a:raise ValueError('Choose or add a council first.')
             if p.path=='/api/status':
                 with lock:result=dict(running=state['running'],job_council=state['council'],messages=list(state['messages']),action=state.get('action',''),label=LABELS.get(state.get('action',''),''),auto=state.get('auto',False),progress=dict(state.get('progress',{})),started=state.get('started'),stop_requested=stop_requested.is_set())
-                result.update(a.stats());result['root']=str(a.root);result['name']=profiles[key]['name']
+                result.update(a.stats());result['root']=str(a.root);result['name']=profiles[key]['name'];result.update(a.storage())
                 result.update(latest_check=a.latest_check(),new_unsaved=a.news_count(),
                     auto_check_hours=profiles[key].get('auto_check_hours',0),auto_download=profiles[key].get('auto_download',True))
                 self.respond(result)
@@ -178,6 +185,9 @@ class Handler(BaseHTTPRequestHandler):
             elif p.path=='/api/meetings':self.respond(a.meetings(q.get('committee',[]),valid_date(one('date_from')),valid_date(one('date_to'))))
             elif p.path=='/api/papers':self.respond(a.papers(meeting_urls=q.get('meeting',[])[:500]))
             elif p.path=='/api/news':self.respond(a.news(one('window','latest'),q.get('committee',[]),one('unsaved')=='1',one('baseline')=='1'))
+            elif p.path=='/api/late':
+                from late import report
+                self.respond(report(a,q.get('committee',[]),valid_date(one('date_from')),valid_date(one('date_to'))))
             elif p.path=='/api/runs':self.respond(a.runs())
             elif p.path=='/api/ocr':
                 import ocr

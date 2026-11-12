@@ -79,6 +79,7 @@ nav.tabs button[aria-current=page]{background:var(--surface);color:var(--ink);bo
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:650;padding:2px 9px;border-radius:999px;white-space:nowrap;vertical-align:2px;letter-spacing:.01em}
 .pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
 .pill.saved{background:var(--good-soft);color:var(--good)}.pill.missing{background:var(--warn-soft);color:var(--warn)}
+.pill.late{background:color-mix(in srgb,var(--danger) 14%,transparent);color:var(--danger)}
 .pill.new{background:var(--new-soft);color:var(--new)}.pill.upcoming{background:var(--violet-soft);color:var(--violet)}
 
 /* Paper rows */
@@ -113,7 +114,7 @@ nav.tabs button[aria-current=page]{background:var(--surface);color:var(--ink);bo
 .picker>summary::after{content:'';position:absolute;right:13px;top:50%;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg)}
 .picker>summary::-webkit-details-marker{display:none}
 .picker .body{position:absolute;z-index:20;top:calc(100% + 6px);left:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);width:min(420px,90vw);padding:12px}
-#searchpicker .body,#newpicker .body{left:auto;right:0}
+#searchpicker .body,#newpicker .body,#latepicker .body{left:auto;right:0}
 .picker .list{max-height:300px;overflow:auto;margin:8px -4px}
 .picker .list label{display:flex;gap:9px;padding:6px 8px;font-size:14px;align-items:flex-start;border-radius:6px;cursor:pointer}
 .picker .list label:hover{background:var(--surface-2)}
@@ -168,6 +169,7 @@ main>p.muted{text-align:center;margin-top:24px}
 <button data-view="new" aria-current="page">New papers<span class="badge" id="newbadge" hidden></span></button>
 <button data-view="browse">Committees &amp; meetings</button>
 <button data-view="search">Search</button>
+<button data-view="late">Late papers</button>
 <button data-view="tools">Tools</button>
 </nav>
 
@@ -231,6 +233,18 @@ main>p.muted{text-align:center;margin-top:24px}
 <div class="bar" style="margin-top:12px"><button class="secondary" id="prev">Previous</button><span id="pageinfo"></span><button class="secondary" id="next">Next</button></div></section>
 </section>
 
+<!-- LATE PAPERS -->
+<section id="view-late" hidden><section class="panel">
+<div class="bar"><h2 style="margin:0">Papers published after the deadline</h2><span class="spacer"></span>
+<label class="field" for="lateperiod" style="margin:0">Meetings</label><select id="lateperiod"><option value="90">Last 3 months and upcoming</option><option value="365" selected>Last 12 months and upcoming</option><option value="all">All dates</option></select>
+<details class="picker" id="latepicker"></details></div>
+<div class="bar" style="margin-top:8px"><label class="bar" style="gap:6px"><input type="checkbox" id="latecertain"> Only papers that were certainly late</label><span class="spacer"></span><button class="secondary" id="latecsv">Save list (.csv)</button></div>
+<p id="latesummary" class="muted"></p>
+<div id="latelist"></div>
+<p class="muted" style="margin-top:12px" id="laterule"></p>
+<p class="muted">A late paper is not necessarily unlawful. Councils may add urgent items with the chair's agreement, mark reports “to follow”, or publish supplementary papers such as public forum questions. A paper can only be assessed if the meeting page was checked both before and after it appeared, so this list is not complete. Check your council's constitution for its own rule.</p>
+</section></section>
+
 <!-- TOOLS -->
 <section id="view-tools" hidden><div class="tools">
 <section class="panel"><h2>Refresh the full meeting list</h2><p>Normal checks read each committee's current page. This reads every older year too, to find meetings missing from the list. It can take 10 minutes or more. No papers are downloaded.</p><button id="rescan" class="secondary">Refresh full meeting list</button></section>
@@ -240,7 +254,7 @@ main>p.muted{text-align:center;margin-top:24px}
 <details><summary>Recent OCR results</summary><div id="ocrresults"></div></details>
 <details><summary>Windows setup</summary><p>Install Tesseract with English language data, then restart the app. For a custom install, set TESSERACT_CMD to the full path of tesseract.exe. See START-HERE.md. <a href="https://tesseract-ocr.github.io/tessdoc/Installation.html" target="_blank" rel="noopener">Tesseract installation</a></p></details></section>
 <section class="panel wide"><h2>Check history</h2><div class="tablewrap"><table><thead><tr><th>Started</th><th>What</th><th>Scope</th><th>Meetings read</th><th>New papers</th><th>Downloaded</th><th>Problems</th></tr></thead><tbody id="runs"></tbody></table></div></section>
-<section class="panel wide"><h2>Unavailable papers and meeting pages</h2><p class="muted">These could not be retrieved at the last attempt. A refusal or empty response does not prove a paper doesn't exist.</p>
+<section class="panel wide"><h2>Unavailable papers and meeting pages</h2><p class="muted">These could not be retrieved at the last attempt. A refusal or empty response does not prove a paper doesn't exist. Papers that were refused, timed out or postponed are tried again automatically at later checks, up to 6 times each; after that, use the button below.</p>
 <div class="bar"><button id="retrypapers">Try these papers again</button><button id="retrymeetings" class="secondary">Re-check these meeting pages</button><button id="copyproblems" class="secondary">Copy list</button><button id="saveproblems" class="secondary">Save list (.txt)</button></div>
 <p id="problemstatus" role="status"></p><textarea id="problemcopy" hidden readonly style="width:100%;height:200px" aria-label="Copyable problem report"></textarea><div id="problemitems"></div></section>
 <section class="panel wide"><h2>Replaced PDFs</h2><p class="muted">When a council replaces a PDF at the same address, the older copy is kept.</p><div id="replacements"></div></section>
@@ -400,7 +414,7 @@ async function status(){
     const d=await get('/api/status');status0=d;
     const mine=d.job_council===council(),last=d.messages.at(-1)||'';
     $('archivestats').textContent=d.documents.toLocaleString()+' papers in archive';
-    $('root').textContent='Archive folder: '+d.root;
+    $('root').textContent='Archive folder: '+d.root+(d.database?' · Search database kept outside the synced folder at '+d.database+' · backup copy in the archive folder '+(d.backup?'saved '+ago(d.backup):'not saved yet'):'');
     const p=d.progress||{};
     if(d.running){
       const name=[...$('council').options].find(o=>o.value===d.job_council)?.textContent||d.job_council;
@@ -428,7 +442,7 @@ async function status(){
     wasRunning=d.running;
   }catch(e){$('jobtext').textContent='Cannot reach the archive. Check that the launcher window is still open.'}
 }
-async function afterJob(){if(zipAfterJob){const z=zipAfterJob;zipAfterJob=null;await zipMeetings(z.meetings,z.name)}await loadCommittees();await refreshPickedIds();if(view==='new')loadNews();if(view==='browse')loadMeetings();if(view==='search')search();if(view==='tools')loadTools()}
+async function afterJob(){if(zipAfterJob){const z=zipAfterJob;zipAfterJob=null;await zipMeetings(z.meetings,z.name)}await loadCommittees();await refreshPickedIds();if(view==='new')loadNews();if(view==='browse')loadMeetings();if(view==='search')search();if(view==='late')loadLate();if(view==='tools')loadTools()}
 $('stopjob').onclick=async()=>{try{await post('stop',{council:status0.job_council});await status()}catch(e){$('notice').textContent=e.message}};
 
 // ---------- NEW PAPERS ----------
@@ -477,7 +491,7 @@ $('newselectmissing').onclick=()=>{for(const p of newsShown)if(!(p.doc_id||p.dow
 let browseCommittee=null,meetingsShown=[],meetingLimit=100;const pickedMeetings=new Set();
 async function loadCommittees(){
   if(!council())return;
-  try{committeesData=await get('/api/committees');const names=committeesData.map(c=>c.name);checkPicker.set(names);newPicker.set(names);
+  try{committeesData=await get('/api/committees');const names=committeesData.map(c=>c.name);checkPicker.set(names);newPicker.set(names);latePicker.set(names);
     searchPicker.set([...new Set([...(status0.committees||[]),...names.filter(Boolean)])].sort((a,b)=>a.localeCompare(b)));
     renderCommittees();updateEstimate();
   }catch(e){$('notice').textContent=e.message}
@@ -579,6 +593,36 @@ searchPicker.onchange=()=>{offset=0;search()};
 $('prev').onclick=()=>{offset=Math.max(0,offset-30);search()};$('next').onclick=()=>{offset+=30;search()};
 $('searchselect').onclick=()=>{for(const r of searchResults)selectPaper({url:r.url,doc_id:r.id,title:r.title},true);refreshTray()};
 
+// ---------- LATE PAPERS ----------
+let lateShown=[];
+function day(s){return s?new Date(s+'T12:00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'}):''}
+async function loadLate(){
+  if(!council())return;const key=council(),v=$('lateperiod').value;
+  try{
+    const d=await get('/api/late',{committee:latePicker.get(),date_from:v==='all'?'':daysAgo(Number(v))});if(key!==council())return;
+    const certain=$('latecertain').checked,list=$('latelist');list.replaceChildren();lateShown=[];
+    $('laterule').textContent=d.rule;
+    $('latesummary').textContent=plural(d.late,'paper')+' certainly late and '+d.unclear+' that may have been late, across '+plural(d.meetings.length,'meeting')+'.';
+    for(const m of d.meetings){
+      const papers=m.papers.filter(p=>!certain||p.status==='late');if(!papers.length)continue;
+      const g=el('div',undefined,'group'),h=el('div',undefined,'grouphead'),all=document.createElement('input');all.type='checkbox';all.setAttribute('aria-label','Select all papers for this meeting');
+      all.onchange=()=>{for(const p of papers)selectPaper(p,all.checked);refreshTray()};
+      h.append(all,el('h3',m.committee||'Committee unknown'),el('span',m.meeting+' · papers were due by '+day(m.deadline),'muted'),link('Meeting page',m.meeting_url));g.append(h);
+      for(const p of papers){const row=paperRow(p),main=row.children[1];
+        main.querySelector('.title').append(document.createTextNode(' '),el('span',p.status==='late'?'Late':'May be late','pill '+(p.status==='late'?'late':'missing')));
+        main.append(el('div',p.reason,'meta'));g.append(row);lateShown.push({...p,date:m.date,deadline:m.deadline})}
+      list.append(g);
+    }
+    if(!lateShown.length)list.append(el('p',d.meetings.length?'No papers were certainly late in this period.':'No late papers found in this period. Papers can only be assessed for meetings checked more than once, so regular or automatic checks build up this evidence.','muted'));
+  }catch(e){$('latesummary').textContent=e.message}
+}
+const latePicker=new Picker('latepicker',()=>loadLate());
+$('lateperiod').onchange=loadLate;$('latecertain').onchange=loadLate;
+$('latecsv').onclick=()=>{const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const lines=[['Committee','Meeting','Meeting date','Papers due by','Paper','Status','Not on page at check','First seen at check','Evidence','Link'].map(q).join(',')];
+  for(const p of lateShown)lines.push([p.committee,p.meeting,p.date,p.deadline,cleanTitle(p.title).name,p.status==='late'?'Late':'May be late',when(p.previous_check),when(p.first_seen),p.reason,p.url].map(q).join(','));
+  const blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=council()+'-late-papers-'+isoDay(new Date())+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+
 // ---------- TOOLS ----------
 $('rescan').onclick=()=>job('rescan');$('index').onclick=()=>job('index');$('sitecheck').onclick=()=>job('sitecheck');$('runocr').onclick=()=>job('ocr');
 let problemRows=[],problemReport='';
@@ -607,9 +651,9 @@ async function refreshOCR(){const key=council();try{const d=await get('/api/ocr'
 
 // ---------- views, councils ----------
 function show(v){view=v;for(const b of document.querySelectorAll('nav.tabs button')){if(b.dataset.view===v)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}
-  for(const s of['new','browse','search','tools'])$('view-'+s).hidden=s!==v;
+  for(const s of['new','browse','search','late','tools'])$('view-'+s).hidden=s!==v;
   try{localStorage.setItem('archive-view',v)}catch(e){}
-  if(v==='new')loadNews();if(v==='browse')loadMeetings();if(v==='search')search();if(v==='tools')loadTools()}
+  if(v==='new')loadNews();if(v==='browse')loadMeetings();if(v==='search')search();if(v==='late')loadLate();if(v==='tools')loadTools()}
 for(const b of document.querySelectorAll('nav.tabs button'))b.onclick=()=>show(b.dataset.view);
 $('council').onchange=async()=>{picked.clear();pickedMeetings.clear();refreshTray();browseCommittee=null;offset=0;try{localStorage.setItem('archive-council',council())}catch(e){}$('notice').textContent='';await status();await loadCommittees();show(view)};
 async function councils(preferred){const d=await get('/api/councils');
@@ -620,7 +664,7 @@ async function councils(preferred){const d=await get('/api/councils');
   await status();await loadCommittees();
   let v='new';try{v=localStorage.getItem('archive-view')||'new'}catch(e){}
   if(v==='new'&&!status0.latest_check)$('newwindow').value='30d';
-  show(['new','browse','search','tools'].includes(v)?v:'new')}
+  show(['new','browse','search','late','tools'].includes(v)?v:'new')}
 $('addtoggle').onclick=()=>{$('adderror').hidden=true;$('adddialog').showModal()};$('canceladd').onclick=()=>$('adddialog').close();
 $('preset').onchange=()=>{$('custom').hidden=$('preset').value!=='custom'};
 const slugify=t=>t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,50);

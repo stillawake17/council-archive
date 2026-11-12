@@ -95,13 +95,13 @@ The first two presets are Bristol and Birmingham. Other ModernGov and CMIS counc
 Each council uses its own root folder. Under that root:
 
 - data/raw_documents/web_downloads: new PDFs, with URL-based identifiers in filenames.
-- data/archive_web/search.sqlite3: search, download registry and first-seen observations.
+- data/archive_web/search.sqlite3: search, download registry and first-seen observations. If the archive folder is inside OneDrive, Dropbox, Google Drive or iCloud, this file is kept in %LOCALAPPDATA%\CouncilArchive instead, and data/archive_web/search-backup.sqlite3 is a copy saved once a day while the app is open. On a new computer the backup is restored automatically.
 - data/archive_web/page_snapshots and page_checks.jsonl: meeting-page evidence.
 - data/archive_web/versions and replacements.jsonl: replaced PDF evidence.
 - data/archive_web/activity.log: complete activity and failure log.
 - data/archive_web/last_update.json: latest completed update counts.
 
-Do not delete search.sqlite3 as a way to refresh search; it also holds monitoring history. Use Add saved PDFs to search. Snapshots and old versions accumulate. Back up the full archive folder and councils-local.json. Archive folders must be separate and must not be nested inside one another.
+Do not delete search.sqlite3 or search-backup.sqlite3 as a way to refresh search; it also holds monitoring history. Use Add saved PDFs to search. Snapshots and old versions accumulate. Back up the full archive folder and councils-local.json. Archive folders must be separate and must not be nested inside one another.
 
 ## Validation
 

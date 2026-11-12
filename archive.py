@@ -2,9 +2,44 @@
 from pathlib import Path
 from contextlib import contextmanager
 from urllib.parse import urljoin, urlparse, parse_qsl, urlencode, urlunparse
-import csv, hashlib, json, re, sqlite3, time
+import csv, hashlib, json, os, re, shutil, sqlite3, time
 from datetime import datetime, timezone, timedelta, date
 from pypdf import PdfReader
+
+# Downloads: seconds between papers, and how a refusing website (HTTP 403/429) is handled.
+PAUSE = .5
+REFUSAL_WAIT = 60     # wait this long, then try the refused paper once more
+REFUSAL_LIMIT = 3     # after this many refusals in a row, leave the rest for a later check
+RETRY_LIMIT = 6       # automatic attempts per paper before it is left for you to retry by hand
+FULL_LISTS_FROM = '2026-11-11T00:00:00+00:00'   # release that began reading agenda items' full document lists
+ITEM_TITLE = re.compile(r', item \d')            # how ModernGov titles a paper listed under an agenda item
+POSTPONED = 'Postponed: the council website was refusing downloads. It will be tried again at a later check.'
+
+
+def synced_folder(path):
+    """True inside a cloud-synced folder. Sync tools can corrupt a database that is rewritten while they copy it."""
+    path = Path(path)
+    for key in ('OneDrive', 'OneDriveConsumer', 'OneDriveCommercial'):
+        home = os.environ.get(key)
+        if home and path.is_relative_to(Path(home).resolve()): return True
+    return any(mark in part.lower() for part in path.parts for mark in ('onedrive', 'dropbox', 'google drive', 'icloud'))
+
+
+def local_store():
+    """A folder on this computer that is not synced, for live databases."""
+    return Path(os.environ.get('COUNCIL_ARCHIVE_LOCAL') or os.environ.get('LOCALAPPDATA') or Path.home()/'.local'/'share')/'CouncilArchive'
+
+
+def copy_database(source, target):
+    """A consistent copy of an SQLite database, safe while it is in use; verified before it replaces the target."""
+    tmp = target.with_name(target.name+'.part'); tmp.unlink(missing_ok=True)
+    a = sqlite3.connect(source, timeout=30); b = sqlite3.connect(tmp)
+    try:
+        a.backup(b)
+        if b.execute('PRAGMA quick_check').fetchone()[0] != 'ok': raise RuntimeError('The copy failed its integrity check.')
+    finally:
+        b.close(); a.close()
+    tmp.replace(target)
 
 
 def canonical(url):
@@ -41,6 +76,8 @@ class Archive:
         self.work = self.root / 'data' / 'archive_web'
         self.work.mkdir(parents=True, exist_ok=True)
         self.dbpath = self.work / 'search.sqlite3'
+        self.backup_path = self.work / 'search-backup.sqlite3'
+        if synced_folder(self.root): self.relocate()
         self._news_cache = (None, None)
         with self.connect() as db:
             db.executescript('''
@@ -66,6 +103,71 @@ class Archive:
         import ocr
         ocr.initialise(self)
         self.repair_names()
+        self.reader_changes()
+
+    def reader_changes(self):
+        """When the app learned to read agenda items' full document lists, papers that had been hidden turned up
+        all at once. They were uncovered, not newly published, so they must not carry an 'appeared between' window.
+        self.full_lists is the time from which every check of this archive reads those lists."""
+        path=self.work/'reader_changes.json'
+        if path.exists():
+            self.full_lists=json.loads(path.read_text(encoding='utf-8'))['full_lists'];return
+        self.full_lists=now()
+        with self.connect() as db:
+            rows=[dict(r) for r in db.execute("SELECT * FROM observations WHERE first_seen>=? AND previous_check<>''",(FULL_LISTS_FROM,))
+                  if ITEM_TITLE.search(r['title'] or '')]
+            if rows:
+                # Keep a record of what was changed, then clear the misleading window.
+                with (self.work/'reader_changes.jsonl').open('a',encoding='utf-8') as f:
+                    for r in rows:f.write(json.dumps(dict(r,change='previous_check cleared: uncovered by reading full item lists, not newly published'))+'\n')
+                db.executemany("UPDATE observations SET previous_check='' WHERE url=? AND meeting_url=?",[(r['url'],r['meeting_url']) for r in rows])
+        self.write_json('reader_changes.json',dict(full_lists=self.full_lists))
+
+    def relocate(self):
+        """Keep the live database on this computer, outside the synced archive folder.
+        A daily copy (search-backup.sqlite3) stays in the archive folder so the sync service backs it up."""
+        inplace = self.dbpath
+        key = hashlib.sha256(str(self.root).lower().encode()).hexdigest()[:10]
+        local = local_store()/f"{self.profile['id']}-{key}"/'search.sqlite3'
+        moved = False
+        try:
+            local.parent.mkdir(parents=True, exist_ok=True)
+            if not local.exists():
+                # First run here: take the database from the archive folder, or restore the backup on a new computer.
+                source = inplace if inplace.exists() else self.backup_path if self.backup_path.exists() else None
+                if source:
+                    if shutil.disk_usage(local.parent).free < source.stat().st_size*1.2:
+                        raise RuntimeError('Not enough free disk space.')
+                    print(f"{self.profile['name']}: copying the search database to {local.parent} (one-off; may take a minute)…", flush=True)
+                    copy_database(source, local)
+                    moved = source == inplace
+            (local.parent/'archive-folder.txt').write_text(str(self.root), encoding='utf-8')
+        except Exception as e:
+            print(f"{self.profile['name']}: the search database stays in the archive folder ({e})", flush=True)
+            return
+        self.dbpath = local
+        try:
+            if inplace.exists():
+                # The copy that was just taken becomes the first backup; any other stray copy is set aside, not deleted.
+                inplace.replace(self.backup_path if moved else self.work/'search-superseded.sqlite3')
+                if moved: os.utime(self.backup_path)
+            for suffix in ('-wal', '-shm'): Path(str(inplace)+suffix).unlink(missing_ok=True)
+        except OSError: pass
+
+    def backup(self, max_age_hours=24):
+        """Copy the live database into the archive folder if it has changed since the last copy. True if copied."""
+        if self.dbpath.parent == self.work: return False
+        changed = max((p.stat().st_mtime for p in (self.dbpath, Path(str(self.dbpath)+'-wal')) if p.exists()), default=0)
+        have = self.backup_path.stat().st_mtime if self.backup_path.exists() else 0
+        if changed <= have or time.time()-have < max_age_hours*3600: return False
+        copy_database(self.dbpath, self.backup_path)
+        return True
+
+    def storage(self):
+        local = self.dbpath.parent != self.work
+        saved = self.backup_path.stat().st_mtime if local and self.backup_path.exists() else 0
+        return dict(database=str(self.dbpath) if local else '',
+                    backup=datetime.fromtimestamp(saved, timezone.utc).isoformat() if saved else '')
 
     def repair_names(self):
         """Older versions could save long-titled papers without '.pdf', which kept them out of search."""
@@ -355,8 +457,10 @@ class Archive:
         with self.connect() as db:
             return [dict(r) for r in db.execute('SELECT * FROM observations ORDER BY first_seen DESC LIMIT 500')]
 
-    def record_observation(self, meeting_url, committee, meeting, found, html, checked):
-        """Archive the page, then record links. Returns (links first seen now, whether this was the first check)."""
+    def record_observation(self, meeting_url, committee, meeting, found, html, checked, item_pages=()):
+        """Archive the page, then record links. Returns (links first seen now, whether this was the first check).
+        item_pages: links found only on agenda items' own pages. If the previous check predates reading those
+        pages, such a link may have been there all along, so no 'appeared between' window is recorded for it."""
         folder=self.work/'page_snapshots'/hashlib.sha256(meeting_url.encode()).hexdigest()[:20]
         folder.mkdir(parents=True,exist_ok=True)
         snapshot=folder/(checked.replace(':','-')+'.html')
@@ -364,9 +468,10 @@ class Archive:
         added=0
         with self.connect() as db:
             old=db.execute('SELECT checked FROM meeting_checks WHERE url=?',(meeting_url,)).fetchone()
+            before=old['checked'] if old else ''
             for url,title in found:
                 cur=db.execute('INSERT OR IGNORE INTO observations VALUES(?,?,?,?,?,?,?)',
-                    (url,meeting_url,title,committee,meeting,checked,old['checked'] if old else ''))
+                    (url,meeting_url,title,committee,meeting,checked,'' if url in item_pages and before<self.full_lists else before))
                 added+=cur.rowcount
             db.execute('INSERT OR REPLACE INTO meeting_checks VALUES(?,?)',(meeting_url,checked))
         with (self.work/'page_checks.jsonl').open('a',encoding='utf-8') as f:
@@ -465,7 +570,7 @@ class Archive:
         reader=Reader(self.profile['system'])
         failures=IssueList(self)
         kind='fetch' if urls else 'check'
-        summary=dict(meetings=0,added=0,baseline=0,downloaded=0,failed=0,note='')
+        summary=dict(meetings=0,added=0,baseline=0,downloaded=0,failed=0,postponed=0,note='')
         with self.connect() as db:
             run=db.execute('INSERT INTO check_runs(started,kind,scope,auto) VALUES(?,?,?,?)',(now(),kind,scope,int(auto))).lastrowid
         stopped=False
@@ -495,13 +600,15 @@ class Archive:
                             if not reader.recognised(page.url,html):
                                 raise RuntimeError('Meeting page was not recognised; no publication observation recorded.')
                             # Papers beyond the first few for an agenda item are only on the item's own page.
+                            item_pages=set()
                             for u,t in dict.fromkeys(x for x in listed if reader.more_documents(*x)):
                                 try:
                                     known={x for x,_ in found}
-                                    found+=[(x,tt) for x,tt in links(u) if reader.document(x) and x not in known]
+                                    more=[(x,tt) for x,tt in links(u) if reader.document(x) and x not in known]
+                                    found+=more;item_pages.update(x for x,_ in more)
                                 except Exception as e:failures.append(f'{u}: {e}')
                             resolve(self,m['url'])
-                            added,first=self.record_observation(m['url'],m['committee'],m['label'],found,html,now())
+                            added,first=self.record_observation(m['url'],m['committee'],m['label'],found,html,now(),item_pages)
                             summary['meetings']+=1
                             if first:summary['baseline']+=added
                             else:
@@ -511,6 +618,7 @@ class Archive:
                                 docs.setdefault(u,dict(title=t or 'Council paper',committee=m['committee'],meeting=m['label'],meeting_url=m['url']))
                         except Exception as e:failures.append(f"{m['url']}: {e}")
                     progress(dict(phase='Checking meeting pages',total=len(chosen),completed=summary['meetings']))
+                paths=[];refused=False
                 if download and docs and not stopped:
                     saved=self.lookup_saved(docs)
                     todo={u:m for u,m in docs.items() if recheck or u not in saved}
@@ -518,9 +626,19 @@ class Archive:
                         log(f'Downloading {len(todo)} paper(s) not yet in your archive…')
                         counts,paths,stopped=self.download(page,todo,recheck,log,failures,progress,should_stop)
                         summary['downloaded']=counts['new']+counts['changed'];summary['failed']=counts['failed']
-                        if paths:
-                            progress({});self.index(log,only=paths)
+                        summary['postponed']=counts['postponed'];refused=counts['refused']
                     else:log('Every paper found is already in your archive.')
+                if download and not urls and not stopped:
+                    # Papers refused or timed out at earlier checks get another go, without being asked.
+                    again={} if refused else self.retry_queue(skip=docs)
+                    if again:
+                        log(f'Trying again: {len(again)} paper(s) that could not be downloaded at earlier checks…')
+                        counts,more,stopped=self.download(page,again,False,log,failures,progress,should_stop)
+                        summary['downloaded']+=counts['new']+counts['changed'];summary['failed']+=counts['failed']
+                        summary['postponed']+=counts['postponed'];refused=counts['refused'];paths+=more
+                    if refused or again:self.retry_pause(refused)
+                if paths:
+                    progress({});self.index(log,only=paths)
                 pending=[] if stopped else self.unindexed()
                 if pending:
                     log(f'Adding {len(pending)} saved paper(s) that were missing from search…')
@@ -537,6 +655,7 @@ class Archive:
         if summary['meetings']:parts.append(f"checked {summary['meetings']} meeting page(s)")
         if kind=='check':parts.append(f"{summary['added']} new paper(s) since previous checks"+(f", {summary['baseline']} seen for the first time on newly checked meetings" if summary['baseline'] else ''))
         parts.append(f"{summary['downloaded']} downloaded")
+        if summary['postponed']:parts.append(f"{summary['postponed']} postponed because the website was refusing downloads (they will be tried again at a later check)")
         if failures:parts.append(f'{len(failures)} problem(s) – see Tools › Unavailable papers')
         log(('Stopped: ' if stopped else 'Finished: ')+'; '.join(parts)+'.')
         return summary
@@ -549,10 +668,34 @@ class Archive:
                 if row and (self.root/row['path']).is_file():saved.add(u)
         return saved
 
+    def retry_queue(self, skip=()):
+        """Papers not yet saved whose earlier download failed for a reason that may pass: refused, timed out, postponed."""
+        from problems import items, resolve, RETRYABLE
+        state=self.work/'retry_state.json'
+        if state.exists() and json.loads(state.read_text(encoding='utf-8')).get('next','')>now():return {}
+        rows=[r for r in items(self) if r['kind']!='Meeting page' and r['category'] in RETRYABLE
+              and r.get('attempts',0)<RETRY_LIMIT and r['url'] not in skip]
+        rows.sort(key=lambda r:r.get('attempts',0))
+        if not rows:return {}
+        docs={}
+        for p in self.papers(urls=[r['url'] for r in rows[:300]]):
+            docs.setdefault(p['url'],dict(title=p['title'] or 'Council paper',committee=p['committee'],meeting=p['meeting'],meeting_url=p['meeting_url']))
+        for u in self.lookup_saved(docs):
+            resolve(self,u);del docs[u]
+        return docs
+
+    def retry_pause(self, refused):
+        """If the website is still refusing, leave the retry list alone for a while: 6 hours, then 12, 24, 48."""
+        state=self.work/'retry_state.json'
+        if not refused:
+            state.unlink(missing_ok=True);return
+        hours=min(48,2*(json.loads(state.read_text(encoding='utf-8')).get('hours',3) if state.exists() else 3))
+        self.write_json('retry_state.json',dict(hours=hours,next=(datetime.now(timezone.utc)+timedelta(hours=hours)).isoformat()))
+
     def download(self, page, discovered, recheck, log, failures, progress, should_stop):
-        from problems import resolve
-        counts=dict(new=0,existing=0,changed=0,failed=0)
-        paths=[];stopped=False
+        from problems import resolve, add_message
+        counts=dict(new=0,existing=0,changed=0,failed=0,postponed=0)
+        paths=[];stopped=False;pause=PAUSE;refusals=0
         out=self.root/'data'/'raw_documents'/'web_downloads'; out.mkdir(parents=True,exist_ok=True)
         # Only trust old filename associations when a title maps to one distinct URL.
         legacy={}
@@ -579,11 +722,26 @@ class Archive:
                 oldfile=self.root/'data'/'raw_documents'/fn
                 if not recheck and legacy.get(fn)=={url} and oldfile.exists() and is_pdf(oldfile):
                     target=oldfile; counts['existing']+=1
+                elif refusals>=REFUSAL_LIMIT:
+                    # The website keeps refusing: stop asking, and leave the rest for a later check.
+                    counts['postponed']+=1;add_message(self,url+': '+POSTPONED,m,count=False)
+                    continue
                 else:
                     # Keep the full path within Windows' 260-character limit.
                     room=max(20,min(100,240-len(str(out))-26))
                     target=out/(hashlib.sha256(url.encode()).hexdigest()[:20]+'_'+fn[:-4][:room]+'.pdf')
                     response=page.request.get(url,timeout=60000)
+                    if response.status in (403,429):
+                        # Usually a sign of too many requests: slow down, wait, and try this paper once more.
+                        log(f'The council website refused a download. Waiting {REFUSAL_WAIT} seconds before trying again…')
+                        pause=min(pause*2,4)
+                        for _ in range(REFUSAL_WAIT):
+                            if should_stop():break
+                            time.sleep(1)
+                        response=page.request.get(url,timeout=60000)
+                        refusals=refusals+1 if response.status in (403,429) else 0
+                        if refusals==REFUSAL_LIMIT:log('The council website is still refusing downloads. The remaining papers will be tried again at a later check.')
+                    elif response.ok:refusals=0
                     if not response.ok: raise RuntimeError(f'HTTP {response.status}')
                     body=response.body()
                     if not body: raise RuntimeError('Empty response from council document link')
@@ -607,7 +765,7 @@ class Archive:
                             counts['changed']+=1
                             log('Replaced PDF detected; old copy preserved: '+m['title'])
                         else: counts['new']+=1
-                    time.sleep(.2)
+                    time.sleep(pause)
                 resolve(self,url)
                 rel=target.relative_to(self.root).as_posix();paths.append(rel)
                 with self.connect() as db:
@@ -617,7 +775,9 @@ class Archive:
             except Exception as e:
                 counts['failed']+=1; failures.append(f'{url}: {e}')
         progress(dict(phase='Downloading papers',total=len(discovered),completed=len(discovered)))
-        log(f'Downloads: {counts["new"]} new, {counts["existing"]} already saved, {counts["changed"]} replaced, {counts["failed"]} failed.')
+        log(f'Downloads: {counts["new"]} new, {counts["existing"]} already saved, {counts["changed"]} replaced, {counts["failed"]} failed'
+            +(f', {counts["postponed"]} postponed' if counts['postponed'] else '')+'.')
+        counts['refused']=refusals>=REFUSAL_LIMIT
         return counts,paths,stopped
 
 

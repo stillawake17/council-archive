@@ -3,7 +3,11 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, unquote
 import json,re
 
+# Failures that may pass by themselves; the app tries these papers again at later checks.
+RETRYABLE={'Access refused (HTTP 403)','Empty response','Timed out','Could not check or retrieve','Waiting to try again'}
+
 def category(reason):
+    if reason.startswith('Postponed'):return 'Waiting to try again'
     if 'HTTP 404' in reason:return 'Not found (HTTP 404)'
     if 'HTTP 410' in reason:return 'Removed (HTTP 410)'
     if 'HTTP 403' in reason:return 'Access refused (HTTP 403)'
@@ -27,7 +31,7 @@ def initialise(a):
             add_message(a,line.split('Needs attention: ',1)[1],timestamp=timestamp,imported=True)
     marker.write_text('Imported previous log once; subsequent records come from source checks.',encoding='utf-8')
 
-def add_message(a,message,context=None,timestamp=None,imported=False):
+def add_message(a,message,context=None,timestamp=None,imported=False,count=True):
     if not message.startswith(('https://','http://')) or ': ' not in message:return
     url,reason=message.split(': ',1)
     from archive import canonical
@@ -47,7 +51,7 @@ def add_message(a,message,context=None,timestamp=None,imported=False):
         record=dict(url=url,title=title or 'Document link',committee=info.get('committee',''),meeting=info.get('meeting',''),
             meeting_url=info.get('meeting_url',''),category=category(reason),reason=reason,
             first_failed=previous.get('first_failed',now),last_failed=now,
-            attempts=previous.get('attempts',0)+1,imported=imported,kind='Meeting page' if meeting_page else 'Document or source page')
+            attempts=previous.get('attempts',0)+(1 if count else 0),imported=imported,kind='Meeting page' if meeting_page else 'Document or source page')
         db.execute('INSERT OR REPLACE INTO source_problems VALUES(?,?)',(url,json.dumps(record)))
 
 def resolve(a,url):
