@@ -419,8 +419,24 @@ class Archive:
             r=db.execute("SELECT * FROM check_runs WHERE kind IN ('check','fetch') AND meetings>0 ORDER BY id DESC LIMIT 1").fetchone()
         return dict(r) if r else None
 
-    def news(self, window='latest', committees=(), unsaved=False, baseline=False):
-        """Papers first seen recently. Links present at the first check of an older meeting are baseline, not news."""
+    def watch_matches(self, doc_ids, terms):
+        """Which of these saved papers mention each watch-word, and the first page where they do."""
+        hits={};ids=list(dict.fromkeys(doc_ids))
+        with self.connect() as db:
+            for term in terms:
+                match='"'+term.replace('"','""')+'"'
+                try:
+                    for i in range(0,len(ids),900):
+                        part=ids[i:i+900]
+                        for r in db.execute('SELECT doc_id,min(CAST(page AS INTEGER)) AS page FROM pages WHERE pages MATCH ? AND doc_id IN ('
+                                +','.join('?'*len(part))+') GROUP BY doc_id',[match]+part).fetchall():
+                            hits.setdefault(r['doc_id'],[]).append(dict(term=term,page=r['page']))
+                except sqlite3.OperationalError:continue   # nothing searchable in this term, such as punctuation only
+        return hits
+
+    def news(self, window='latest', committees=(), unsaved=False, baseline=False, watch=(), watched=False):
+        """Papers first seen recently. Links present at the first check of an older meeting are baseline, not news.
+        watch: words or phrases to flag, searched inside saved papers and in every paper's title."""
         from planning import meeting_date
         run=self.latest_check()
         if window=='latest':
@@ -442,7 +458,16 @@ class Archive:
             r['is_new']=is_news(r,meeting_date)
             if not r['is_new'] and not baseline:hidden+=1;continue
             papers.append(r)
-        return dict(papers=papers[:2000],total=len(papers),hidden=hidden,since=since,until=until,run=run)
+        mentions=0
+        if watch:
+            hits=self.watch_matches([r['doc_id'] for r in papers if r['doc_id']],watch)
+            for r in papers:
+                found=list(hits.get(r['doc_id'],[]));title=(r['title'] or '').lower()
+                found+=[dict(term=t,page=0) for t in watch if t.lower() in title and all(h['term']!=t for h in found)]
+                r['watch']=found
+            mentions=sum(bool(r['watch']) for r in papers)
+            if watched:papers=[r for r in papers if r['watch']]
+        return dict(papers=papers[:2000],total=len(papers),hidden=hidden,since=since,until=until,run=run,mentions=mentions)
 
     def news_count(self):
         """New papers from the latest check that are not yet in the archive (cached per check)."""

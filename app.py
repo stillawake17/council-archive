@@ -178,13 +178,15 @@ class Handler(BaseHTTPRequestHandler):
                 with lock:result=dict(running=state['running'],job_council=state['council'],messages=list(state['messages']),action=state.get('action',''),label=LABELS.get(state.get('action',''),''),auto=state.get('auto',False),progress=dict(state.get('progress',{})),started=state.get('started'),stop_requested=stop_requested.is_set())
                 result.update(a.stats());result['root']=str(a.root);result['name']=profiles[key]['name'];result.update(a.storage())
                 result.update(latest_check=a.latest_check(),new_unsaved=a.news_count(),
-                    auto_check_hours=profiles[key].get('auto_check_hours',0),auto_download=profiles[key].get('auto_download',True))
+                    auto_check_hours=profiles[key].get('auto_check_hours',0),auto_download=profiles[key].get('auto_download',True),
+                    watch=profiles[key].get('watch',[]))
                 self.respond(result)
             elif p.path=='/api/search':self.respond(a.search(one('q'),q.get('committee',[]),max(0,int(one('offset','0'))),one('issues')=='1',one('date_from'),one('date_to'),one('sort','relevance')))
             elif p.path=='/api/committees':self.respond(a.committees())
             elif p.path=='/api/meetings':self.respond(a.meetings(q.get('committee',[]),valid_date(one('date_from')),valid_date(one('date_to'))))
             elif p.path=='/api/papers':self.respond(a.papers(meeting_urls=q.get('meeting',[])[:500]))
-            elif p.path=='/api/news':self.respond(a.news(one('window','latest'),q.get('committee',[]),one('unsaved')=='1',one('baseline')=='1'))
+            elif p.path=='/api/news':self.respond(a.news(one('window','latest'),q.get('committee',[]),one('unsaved')=='1',one('baseline')=='1',
+                profiles[key].get('watch',[]),one('watched')=='1'))
             elif p.path=='/api/late':
                 from late import report
                 self.respond(report(a,q.get('committee',[]),valid_date(one('date_from')),valid_date(one('date_to'))))
@@ -282,6 +284,12 @@ class Handler(BaseHTTPRequestHandler):
                     if hours not in AUTO_HOURS:raise ValueError('Choose a supported check interval.')
                     profiles[key].update(auto_check_hours=hours,auto_download=bool(data.get('auto_download',True)));save()
                     return self.respond(profiles[key])
+                if action=='watch':
+                    key=data.get('council','')
+                    if key not in profiles:raise ValueError('Choose a council first.')
+                    terms=list(dict.fromkeys(' '.join(t.split())[:100] for t in strings(data.get('terms') or [],200,'watch-word') if t.strip()))[:50]
+                    profiles[key]['watch']=terms;save()
+                    return self.respond({'watch':terms})
                 if action=='add':
                     if state['running']:return self.respond({'error':'Wait for the current task to finish.'},409)
                     return self.respond(add_profile(data))

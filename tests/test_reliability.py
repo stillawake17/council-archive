@@ -85,6 +85,22 @@ class UncoveredPaperTests(unittest.TestCase):
             self.assertEqual(by[x+'c.pdf'],'');self.assertEqual(by[x+'b.pdf'],'2026-11-06T12:00:00+00:00')
             self.assertIn('c.pdf',(b.work/'reader_changes.jsonl').read_text(encoding='utf-8'))
 
+class WatchWordTests(unittest.TestCase):
+    def test_new_papers_are_flagged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a=Archive(tmp);m='https://council.test/ieListDocuments.aspx?MId=1';x='https://council.test/'
+            a.record_observation(m,'Cabinet','1 Jan 2099',[(x+'a.pdf','Lease report'),(x+'b.pdf','Ashton Court update'),(x+'c.pdf','Minutes')],'<html></html>',archive.now())
+            with a.connect() as db:
+                db.execute("INSERT INTO docs VALUES(7,'a.pdf','Lease report','Cabinet','1 Jan 2099',?,'',2,'')",(x+'a.pdf',))
+                db.executemany('INSERT INTO pages VALUES(7,?,?,?)',[(1,'Lease report','Introduction'),(2,'Lease report','The Ashton  Court mansion lease')])
+            d=a.news('7d',watch=['ashton court','"','zebra'])
+            by={p['url']:p['watch'] for p in d['papers']}
+            self.assertEqual(by[x+'a.pdf'],[dict(term='ashton court',page=2)])       # found inside a saved paper
+            self.assertEqual(by[x+'b.pdf'],[dict(term='ashton court',page=0)])       # not downloaded: matched on its title
+            self.assertEqual(by[x+'c.pdf'],[]);self.assertEqual(d['mentions'],2)
+            self.assertEqual(len(a.news('7d',watch=['ashton court'],watched=True)['papers']),2)
+            self.assertNotIn('watch',a.news('7d')['papers'][0])
+
 class DatabaseLocationTests(unittest.TestCase):
     def test_database_moves_out_of_synced_folder_and_is_backed_up(self):
         with tempfile.TemporaryDirectory() as tmp:

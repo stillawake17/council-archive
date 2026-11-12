@@ -197,7 +197,12 @@ main>p.muted{text-align:center;margin-top:24px}
 <label class="field" for="newwindow" style="margin:0">Show</label><select id="newwindow"><option value="latest">Found by the latest check</option><option value="7d">Found in the last 7 days</option><option value="30d">Found in the last 30 days</option><option value="90d">Found in the last 90 days</option></select>
 <details class="picker" id="newpicker"></details></div>
 <div class="bar" style="margin-top:8px"><label class="bar" style="gap:6px"><input type="checkbox" id="newunsaved"> Only papers not yet in my archive</label>
-<label class="bar" style="gap:6px"><input type="checkbox" id="newbaseline"> Include older meetings checked for the first time</label></div>
+<label class="bar" style="gap:6px"><input type="checkbox" id="newbaseline"> Include older meetings checked for the first time</label>
+<label class="bar" style="gap:6px"><input type="checkbox" id="newwatched"> Only papers mentioning my watch-words</label></div>
+<details style="margin-top:8px"><summary>Watch-words <span class="muted" id="watchcount"></span></summary>
+<p class="muted">Newly found papers that mention any of these words or phrases are flagged, with a link to the page. Put one on each line. The app searches inside papers that are in your archive; papers not yet downloaded are matched on their titles only.</p>
+<textarea id="watchterms" rows="4" style="width:100%" aria-label="Watch-words, one per line" placeholder="Ashton Court&#10;exempt&#10;Temple Quarter"></textarea>
+<div class="bar" style="margin-top:6px"><button class="secondary" id="watchsave">Save watch-words</button><span class="muted" id="watchstatus" role="status"></span></div></details>
 <p id="newsummary" class="muted"></p>
 <div class="bar"><button class="secondary" id="newselectall">Select all shown</button><button class="secondary" id="newselectmissing">Select those not in my archive</button></div>
 <div id="newlist"></div>
@@ -283,7 +288,7 @@ main>p.muted{text-align:center;margin-top:24px}
 const TOKEN='__TOKEN__';
 const $=id=>document.getElementById(id);
 const picked=new Map(); // key -> {key,url,doc_id,title}
-let committeesData=[],status0={},wasRunning=false,view='new';
+let committeesData=[],status0={},wasRunning=false,view='new',watchDirty=false;
 
 // ---------- helpers ----------
 function el(tag,text,cls){const e=document.createElement(tag);if(text!==undefined&&text!==null)e.textContent=text;if(cls)e.className=cls;return e}
@@ -401,6 +406,9 @@ function paperRow(p,{showMeeting=false}={}){
   main.append(title);
   const meta=[t.size,showMeeting?[p.committee,p.meeting].filter(Boolean).join(' · '):'',appeared(p)].filter(Boolean).join(' · ');
   if(meta)main.append(el('div',meta,'meta'));
+  if(p.watch&&p.watch.length){title.append(document.createTextNode(' '),el('span','Watch-word','pill upcoming'));
+    const w=el('div','Mentions ','meta');p.watch.forEach((h,i)=>{if(i)w.append(document.createTextNode(', '));
+      w.append(h.page&&p.doc_id?link(h.term+' (page '+h.page+')',pdfUrl(p.doc_id,h.page)):document.createTextNode(h.term+' (in the title)'))});main.append(w)}
   const actions=el('div',undefined,'actions');
   if(p.doc_id){actions.append(link('Open',pdfUrl(p.doc_id)),link('Save PDF',pdfUrl(p.doc_id,0,true),false))}
   if(p.url)actions.append(link('Council site',p.url));
@@ -434,6 +442,8 @@ async function status(){
     for(const id of['checknow','browsecheck','browsefetch','browsezip','trayfetch','rescan','index','sitecheck','runocr','retrypapers','retrymeetings'])$(id).disabled=d.running;for(const b of document.querySelectorAll('.jobbtn'))b.disabled=d.running;
     const badge=$('newbadge');badge.hidden=!d.new_unsaved;badge.textContent=d.new_unsaved;
     document.title=(d.new_unsaved?'('+d.new_unsaved+') ':'')+'Council archive';
+    if(document.activeElement!==$('watchterms')&&!watchDirty){$('watchterms').value=(d.watch||[]).join('\n')}
+    $('watchcount').textContent=(d.watch||[]).length?'('+d.watch.length+' set)':'(none set)';
     if(document.activeElement!==$('autohours')){$('autohours').value=String(d.auto_check_hours);$('autodownload').checked=d.auto_download}
     const logText=d.messages.join('\n')||'No activity in this session.',sel=window.getSelection();
     if($('log').textContent!==logText&&!(sel&&!sel.isCollapsed&&$('log').contains(sel.anchorNode))){$('log').textContent=logText;$('log').scrollTop=$('log').scrollHeight}
@@ -466,13 +476,13 @@ let newsShown=[];
 async function loadNews(){
   if(!council())return;const key=council();
   try{
-    const d=await get('/api/news',{window:$('newwindow').value,committee:newPicker.get(),unsaved:$('newunsaved').checked?'1':'',baseline:$('newbaseline').checked?'1':''});
+    const d=await get('/api/news',{window:$('newwindow').value,committee:newPicker.get(),unsaved:$('newunsaved').checked?'1':'',baseline:$('newbaseline').checked?'1':'',watched:$('newwatched').checked?'1':''});
     if(key!==council())return;
     newsShown=d.papers;const list=$('newlist');list.replaceChildren();
     const w=$('newwindow').value;
     if(w==='latest'&&!d.run){$('newsummary').textContent='No checks yet. Use Check now above, or show the last 30 days.';return}
     const missing=d.papers.filter(p=>!(p.doc_id||p.downloaded)).length;
-    $('newsummary').textContent=(w==='latest'?'Check started '+when(d.run.started)+' ('+d.run.scope+'). ':'')+plural(d.total,'paper')+' shown'+(d.total>d.papers.length?' (first '+d.papers.length+')':'')+', '+missing+' not yet in your archive.'+(d.hidden?' '+plural(d.hidden,'paper')+' already present when an older meeting was first checked are hidden.':'');
+    $('newsummary').textContent=(w==='latest'?'Check started '+when(d.run.started)+' ('+d.run.scope+'). ':'')+plural(d.total,'paper')+' shown'+(d.total>d.papers.length?' (first '+d.papers.length+')':'')+', '+missing+' not yet in your archive.'+((status0.watch||[]).length?' '+plural(d.mentions,'paper')+' mention'+(d.mentions===1?'s':'')+' your watch-words.':'')+(d.hidden?' '+plural(d.hidden,'paper')+' already present when an older meeting was first checked are hidden.':'');
     if(!d.papers.length){list.append(el('p',w==='latest'?'The latest check found nothing new. Try a longer time window.':'Nothing found in this period.','muted'));return}
     const groups=new Map();for(const p of d.papers){if(!groups.has(p.meeting_url))groups.set(p.meeting_url,[]);groups.get(p.meeting_url).push(p)}
     for(const[url,papers]of groups){
@@ -483,7 +493,10 @@ async function loadNews(){
     }
   }catch(e){$('newsummary').textContent=e.message}
 }
-for(const id of['newwindow','newunsaved','newbaseline'])$(id).onchange=loadNews;
+for(const id of['newwindow','newunsaved','newbaseline','newwatched'])$(id).onchange=loadNews;
+$('watchterms').oninput=()=>{watchDirty=true;$('watchstatus').textContent='Not saved yet.'};
+$('watchsave').onclick=async()=>{try{const d=await post('watch',{terms:$('watchterms').value.split('\n')});watchDirty=false;$('watchterms').value=d.watch.join('\n');
+  $('watchstatus').textContent=d.watch.length?plural(d.watch.length,'watch-word')+' saved.':'Watch-words cleared.';await status();loadNews()}catch(e){$('watchstatus').textContent=e.message}};
 $('newselectall').onclick=()=>{for(const p of newsShown)selectPaper(p,true);refreshTray()};
 $('newselectmissing').onclick=()=>{for(const p of newsShown)if(!(p.doc_id||p.downloaded))selectPaper(p,true);refreshTray()};
 
@@ -655,7 +668,7 @@ function show(v){view=v;for(const b of document.querySelectorAll('nav.tabs butto
   try{localStorage.setItem('archive-view',v)}catch(e){}
   if(v==='new')loadNews();if(v==='browse')loadMeetings();if(v==='search')search();if(v==='late')loadLate();if(v==='tools')loadTools()}
 for(const b of document.querySelectorAll('nav.tabs button'))b.onclick=()=>show(b.dataset.view);
-$('council').onchange=async()=>{picked.clear();pickedMeetings.clear();refreshTray();browseCommittee=null;offset=0;try{localStorage.setItem('archive-council',council())}catch(e){}$('notice').textContent='';await status();await loadCommittees();show(view)};
+$('council').onchange=async()=>{watchDirty=false;picked.clear();pickedMeetings.clear();refreshTray();browseCommittee=null;offset=0;try{localStorage.setItem('archive-council',council())}catch(e){}$('notice').textContent='';await status();await loadCommittees();show(view)};
 async function councils(preferred){const d=await get('/api/councils');
   const have=new Set(d.profiles.map(p=>p.id)),pick=$('preset');
   pick.replaceChildren(...d.presets.filter(p=>!have.has(p.id)).map(p=>new Option(p.name,p.id)),new Option('Another council','custom'));$('custom').hidden=pick.value!=='custom';$('council').replaceChildren(...d.profiles.map(p=>new Option(p.name,p.id)));
