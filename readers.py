@@ -43,6 +43,9 @@ class Reader:
         return (('ielistdocuments.aspx' in lo or 'celistdocuments.aspx' in lo) if self.system=='moderngov' else '/ctl/viewmeetingpublic/' in lo)
     def document(self,url):
         return '.pdf' in url.lower() or 'mgconvert2pdf' in url.lower() or (self.system=='cmis' and '/document.ashx?' in url.lower())
+    def more_documents(self,url,text):
+        """ModernGov shows only the first few papers per agenda item, then links to the item's full list."""
+        return self.system=='moderngov' and 'mgai.aspx' in url.lower() and 'full list of documents' in text.lower()
     def recognised(self,url,html):
         lower=html.lower()
         if not self.meeting(url): return False

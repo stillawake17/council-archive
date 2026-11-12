@@ -100,4 +100,9 @@ class CollectTests(unittest.TestCase):
         found=r.discover(home,fetch,lambda s:None,[],pagination=True)
         self.assertEqual(found,{old_meeting:('Audit Committee','16 Jan 2015 10.30 am')})
         self.assertNotIn(older,calls)
+    def test_full_list_of_documents_links(self):
+        r=Reader('moderngov')
+        self.assertTrue(r.more_documents('https://council.test/mgAi.aspx?ID=46917','View the full list of documents for item 12.'))
+        self.assertFalse(r.more_documents('https://council.test/mgAi.aspx?ID=46917','Item 12: Housing delivery'))
+        self.assertFalse(Reader('cmis').more_documents('https://council.test/mgAi.aspx?ID=1','View the full list of documents'))
 if __name__=='__main__':unittest.main()

@@ -489,10 +489,17 @@ class Archive:
                         progress(dict(phase='Checking meeting pages',total=len(chosen),completed=i-1,current=f"{m['committee']} · {m['label']}"))
                         failures.context=dict(committee=m['committee'],meeting=m['label'],meeting_url=m['url'])
                         try:
-                            found=[(u,t) for u,t in links(m['url']) if reader.document(u)]
+                            listed=links(m['url'])
+                            found=[(u,t) for u,t in listed if reader.document(u)]
                             html=page.content()
                             if not reader.recognised(page.url,html):
                                 raise RuntimeError('Meeting page was not recognised; no publication observation recorded.')
+                            # Papers beyond the first few for an agenda item are only on the item's own page.
+                            for u,t in dict.fromkeys(x for x in listed if reader.more_documents(*x)):
+                                try:
+                                    known={x for x,_ in found}
+                                    found+=[(x,tt) for x,tt in links(u) if reader.document(x) and x not in known]
+                                except Exception as e:failures.append(f'{u}: {e}')
                             resolve(self,m['url'])
                             added,first=self.record_observation(m['url'],m['committee'],m['label'],found,html,now())
                             summary['meetings']+=1
