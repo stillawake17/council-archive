@@ -114,7 +114,8 @@ class Reader:
             n=len({u for u,t in links if self.document(u)})
             documents+=n
             log(f'Sample meeting has {n} document links. '+('No links can mean papers are not yet published.' if not n else 'PDF contents have not been checked.'))
-        if not choices:log('No meeting links found within this small sample. Use Find meetings for a wider scan; check the configured website address and reader if that also finds none.')
+        if not ok and failed:log('No page could be read. If the address opens in your own browser, this website probably blocks automated tools; you can still save papers by hand and use Tools > Add saved PDFs to search.')
+        elif not choices:log('No meeting links found within this small sample. Use Find meetings for a wider scan; check the configured website address and reader if that also finds none.')
         elif not checked:log('No sampled meeting page could be checked. Try its link in your browser; you can try the check again later.')
         log(f'Website check complete: {ok} pages accessible, {failed} could not be checked; {checked} meeting pages checked, {documents} document links found. This is a sample only. Saved papers are unchanged. See the activity log for page addresses and details.')
         return dict(accessible=ok,failed=failed,meetings_checked=checked,document_links=documents)

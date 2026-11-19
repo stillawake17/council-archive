@@ -180,7 +180,7 @@ main>p.muted{text-align:center;margin-top:24px}
 <div class="bar" style="align-items:flex-end">
 <div><label class="field">Committees</label><details class="picker" id="checkpicker"></details></div>
 <div><label class="field" for="checkperiod">Meetings</label><select id="checkperiod">
-<option value="recent">Upcoming and last 30 days</option><option value="90">Upcoming and last 3 months</option><option value="year">This year and upcoming</option><option value="custom">Choose dates…</option><option value="all">Every meeting (slow)</option></select></div>
+<option value="recent">Last 30 days and next 8 weeks</option><option value="90">Last 3 months and next 8 weeks</option><option value="year">Last 12 months and next 8 weeks</option><option value="ahead">Last 30 days and all upcoming (slower)</option><option value="custom">Choose dates…</option><option value="all">Every meeting (slow)</option></select></div>
 <div id="checkdates" class="bar" hidden><div><label class="field" for="checkfrom">From</label><input type="date" id="checkfrom"></div><div><label class="field" for="checkto">To</label><input type="date" id="checkto"></div></div>
 <label class="bar" style="gap:6px"><input type="checkbox" id="checkdownload" checked> Download new papers into my archive</label>
 <button id="checknow">Check now</button>
@@ -189,7 +189,7 @@ main>p.muted{text-align:center;margin-top:24px}
 <details style="margin-top:8px"><summary>Automatic checks</summary>
 <div class="bar" style="margin-top:8px"><label for="autohours">While this app is open, check</label><select id="autohours"><option value="0">never</option><option value="3">every 3 hours</option><option value="6">every 6 hours</option><option value="12">every 12 hours</option><option value="24">once a day</option></select>
 <label class="bar" style="gap:6px"><input type="checkbox" id="autodownload" checked> and download what's found</label></div>
-<p class="muted">Automatic checks cover all committees, upcoming meetings and the last 30 days. They only run while the launcher window is open.</p></details>
+<p class="muted">Automatic checks cover all committees, the last 30 days and the next 8 weeks. They only run while the launcher window is open.</p></details>
 </section>
 
 <section class="panel">
@@ -307,6 +307,7 @@ async function post(action,body){const r=await fetch('/api/'+action,{method:'POS
 async function job(action,body){$('notice').textContent='';try{await post(action,body);await status()}catch(e){$('notice').textContent=e.message}}
 function isoDay(d){return d.toISOString().slice(0,10)}
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return isoDay(d)}
+function daysAhead(n){const d=new Date();d.setDate(d.getDate()+n);return isoDay(d)}
 function when(s){if(!s)return'';const d=new Date(s);return d.toLocaleString(undefined,{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
 function ago(s){if(!s)return'never';const m=Math.round((Date.now()-new Date(s))/60000);if(m<1)return'just now';if(m<60)return m+' min ago';const h=Math.round(m/60);if(h<48)return h+' hour'+(h>1?'s':'')+' ago';return Math.round(h/24)+' days ago'}
 function plural(n,word){return n.toLocaleString()+' '+word+(n===1?'':'s')}
@@ -443,7 +444,9 @@ async function status(){
     }else{
       $('jobprogress').hidden=true;
       const r=d.latest_check;
-      $('jobtext').textContent=r?'Last checked '+ago(r.started)+': '+plural(r.added,'new paper')+(r.baseline?' (+'+r.baseline+' on newly checked meetings)':'')+', '+r.downloaded+' downloaded'+(r.failed?', '+plural(r.failed,'problem'):''):'No checks yet. Choose Check now to look for new papers.';
+      const t=d.latest_attempt,failedRun=t&&!t.meetings&&(!r||t.id>r.id);
+      if(failedRun){$('jobtext').textContent='Last check '+ago(t.started)+' could not read the council website ('+plural(t.failed,'page')+' refused). '+(r?'Last successful check '+ago(r.started)+'.':'No successful check yet.')}
+      else $('jobtext').textContent=r?'Last checked '+ago(r.started)+': '+plural(r.added,'new paper')+(r.baseline?' (+'+r.baseline+' on newly checked meetings)':'')+', '+r.downloaded+' downloaded'+(r.failed?', '+plural(r.failed,'problem'):''):'No checks yet. Choose Check now to look for new papers.';
       if(wasRunning)$('jobdetail').textContent=last.replace(/^\S+\s+/,'');
     }
     $('stopjob').hidden=!(d.running&&mine&&['ocr','check','fetch'].includes(d.action));$('stopjob').disabled=d.stop_requested;
@@ -465,8 +468,9 @@ $('stopjob').onclick=async()=>{try{await post('stop',{council:status0.job_counci
 
 // ---------- NEW PAPERS ----------
 function checkRange(){const v=$('checkperiod').value;const y=new Date().getFullYear();
-  if(v==='recent')return{date_from:daysAgo(30),date_to:''};if(v==='90')return{date_from:daysAgo(92),date_to:''};
-  if(v==='year')return{date_from:y+'-01-01',date_to:''};if(v==='custom')return{date_from:$('checkfrom').value,date_to:$('checkto').value};return{date_from:'',date_to:''}}
+  const soon=daysAhead(56);   // papers appear about a week before a meeting, so later meetings have none yet
+  if(v==='recent')return{date_from:daysAgo(30),date_to:soon};if(v==='90')return{date_from:daysAgo(92),date_to:soon};if(v==='ahead')return{date_from:daysAgo(30),date_to:''};
+  if(v==='year')return{date_from:daysAgo(365),date_to:soon};if(v==='custom')return{date_from:$('checkfrom').value,date_to:$('checkto').value};return{date_from:'',date_to:''}}
 async function updateEstimate(){
   $('checkdates').hidden=$('checkperiod').value!=='custom';
   if(!council())return;
@@ -527,7 +531,6 @@ function renderCommittees(){
     b.setAttribute('aria-current',String(browseCommittee===c.name));b.onclick=()=>{browseCommittee=c.name;pickedMeetings.clear();meetingLimit=100;renderCommittees();loadMeetings()};list.append(b)}
 }
 $('committeefilter').oninput=renderCommittees;
-function daysAhead(n){const d=new Date();d.setDate(d.getDate()+n);return isoDay(d)}
 function browseRange(){const v=$('browseperiod').value,today=isoDay(new Date()),y=new Date().getFullYear();
   if(v==='recent')return{date_from:daysAgo(365),date_to:''};
   if(v==='next30')return{date_from:today,date_to:daysAhead(30)};

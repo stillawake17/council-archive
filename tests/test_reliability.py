@@ -70,6 +70,38 @@ class DownloadTests(unittest.TestCase):
         self.a.retry_pause(True);self.assertEqual(self.a.retry_queue(),{})
         self.a.retry_pause(False);self.assertEqual(list(self.a.retry_queue()),[self.urls[0]])
 
+class BlockedWebsiteTests(unittest.TestCase):
+    def test_errors_are_put_plainly(self):
+        self.assertEqual(archive.plain_error(Exception('Page.goto: net::ERR_EMPTY_RESPONSE at https://x\nCall log:\n - navigating')),archive.CLOSED)
+        self.assertIn('timed out',archive.plain_error(Exception('Timeout 30000ms exceeded.')))
+        self.assertEqual(archive.plain_error(Exception('HTTP 404')),'HTTP 404')
+    def test_refresh_explains_a_website_that_blocks_automated_tools(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a=Archive(tmp);failures=[]
+            def refuse(url):raise RuntimeError(archive.CLOSED)
+            a.refresh_meetings(lambda m:None,refuse,failures,full=True)
+            self.assertEqual(failures[-1],archive.BLOCKED_ADVICE)
+            failures=[]
+            a.refresh_meetings(lambda m:None,lambda url:[],failures,full=True)   # reachable, but nothing listed
+            self.assertIn('No meetings found',failures[-1])
+
+class RefusingWebsiteTests(unittest.TestCase):
+    def test_check_stops_when_every_meeting_page_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a=Archive(tmp);m='https://council.test/ieListDocuments.aspx?MId='
+            a.write_json('meeting_catalog.json',dict(created='',issues=[],meetings=[dict(url=m+str(i),committee='Cabinet',label='1 Dec 2026',date='2026-12-01') for i in range(50)]))
+            calls=[]
+            class FakeBrowser:
+                def __enter__(s):
+                    def links(url):calls.append(url);raise RuntimeError('HTTP 403')
+                    return object(),links,lambda u:True
+                def __exit__(s,*e):pass
+            a.browser=lambda *x,**k:FakeBrowser()
+            summary=a.collect(lambda m:None,refresh=False,download=False)
+            self.assertEqual(len(calls),archive.REFUSAL_LIMIT)
+            self.assertIn('refused the first',summary['note'])
+            self.assertEqual(a.latest_attempt()['meetings'],0);self.assertIsNone(a.latest_check())
+
 class UncoveredPaperTests(unittest.TestCase):
     """Papers uncovered when the app learned to read full item lists were not newly published."""
     def test_no_window_for_uncovered_papers(self):

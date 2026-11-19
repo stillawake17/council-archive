@@ -30,7 +30,7 @@ class WebsiteCheckTests(unittest.TestCase):
         def fetch(u):calls.append(u);raise RuntimeError('HTTP 403')
         result=Reader('moderngov').check('https://council.test',fetch,logs.append)
         self.assertEqual(len(calls),1);self.assertEqual(result['failed'],1)
-        self.assertIn('No meeting links',logs[-2]);self.assertIn('complete',logs[-1])
+        self.assertIn('No page could be read',logs[-2]);self.assertIn('complete',logs[-1])
     def test_empty_meeting_and_timeout(self):
         home='https://council.test';a=home+'/ieListDocuments.aspx?MId=1';b=home+'/ieListDocuments.aspx?MId=2'
         def fetch(u):

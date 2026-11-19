@@ -7,7 +7,7 @@ from datetime import datetime, date, timedelta
 # Installed (packaged) copies cannot write beside the program, and carry their own browser.
 FROZEN=getattr(sys,'frozen',False)
 if FROZEN:os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH','0')
-from archive import Archive, local_store
+from archive import Archive, local_store, UPCOMING_DAYS
 from readers import PRESETS
 from exports import pdf_name, disposition, source, bundle, meeting_bundle
 
@@ -165,6 +165,7 @@ def auto_checker():
                 if state['running']:break
                 attempted[key]=time.time()
                 start('check',key,dict(committees=[],date_from=(date.today()-timedelta(days=30)).isoformat(),
+                    date_to=(date.today()+timedelta(days=UPCOMING_DAYS)).isoformat(),
                     download=p.get('auto_download',True)),auto=True)
             break
 
@@ -196,7 +197,7 @@ class Handler(BaseHTTPRequestHandler):
             if p.path=='/api/status':
                 with lock:result=dict(running=state['running'],job_council=state['council'],messages=list(state['messages']),action=state.get('action',''),label=LABELS.get(state.get('action',''),''),auto=state.get('auto',False),progress=dict(state.get('progress',{})),started=state.get('started'),stop_requested=stop_requested.is_set())
                 result.update(a.stats());result['root']=str(a.root);result['name']=profiles[key]['name'];result.update(a.storage())
-                result.update(latest_check=a.latest_check(),new_unsaved=a.news_count(),
+                result.update(latest_check=a.latest_check(),latest_attempt=a.latest_attempt(),new_unsaved=a.news_count(),
                     auto_check_hours=profiles[key].get('auto_check_hours',0),auto_download=profiles[key].get('auto_download',True),
                     watch=profiles[key].get('watch',[]))
                 self.respond(result)

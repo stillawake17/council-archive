@@ -10,6 +10,7 @@ from pypdf import PdfReader
 PAUSE = .5
 REFUSAL_WAIT = 60     # wait this long, then try the refused paper once more
 REFUSAL_LIMIT = 3     # after this many refusals in a row, leave the rest for a later check
+UPCOMING_DAYS = 56    # normal checks look this far ahead: papers are published about a week before a meeting
 RETRY_LIMIT = 6       # automatic attempts per paper before it is left for you to retry by hand
 FULL_LISTS_FROM = '2026-11-11T00:00:00+00:00'   # release that began reading agenda items' full document lists
 ITEM_TITLE = re.compile(r', item \d')            # how ModernGov titles a paper listed under an agenda item
@@ -22,6 +23,28 @@ def bot_check(response):
     try:text=response.body()[:4000].lower()
     except Exception:return False
     return any(mark in text for mark in (b'azure waf',b'js challenge',b'just a moment',b'cf-chl',b'captcha'))
+
+
+CLOSED = 'The website closed the connection without replying, which usually means it blocks automated tools'
+BOT_CHECK = "the website's bot protection asked for a browser check, which this app does not attempt"
+BLOCKED_ADVICE = ('This website appears to block automated tools, so the app cannot read it. Check that the address opens in your '
+                  'own browser. If it does, you can still save papers by hand and search them: put each PDF in '
+                  'data/raw_documents/<committee>/<meeting date>/ inside the archive folder, then use Tools > Add saved PDFs to search.')
+
+
+def plain_error(error):
+    """A browser or network error in words a reader can act on."""
+    text=str(error).splitlines()[0] if str(error) else type(error).__name__
+    if any(k in text for k in ('ERR_EMPTY_RESPONSE','ERR_CONNECTION_RESET','ERR_CONNECTION_CLOSED','ERR_HTTP2_PROTOCOL_ERROR','socket hang up')):return CLOSED
+    if 'ERR_NAME_NOT_RESOLVED' in text:return 'The website address was not found. Check it for typing mistakes'
+    if 'ERR_INTERNET_DISCONNECTED' in text or 'ERR_NETWORK_CHANGED' in text:return 'This computer does not seem to be connected to the internet'
+    if 'ERR_CONNECTION_REFUSED' in text or 'ERR_CONNECTION_TIMED_OUT' in text or 'Timeout' in text:return 'The website did not respond: the request timed out'
+    return text
+
+
+def blocked(failures):
+    """True when every failure so far is the website turning automated tools away."""
+    return bool(failures) and all(CLOSED in f or BOT_CHECK in f or 'HTTP 403' in f for f in failures)
 
 
 def synced_folder(path):
@@ -425,6 +448,12 @@ class Archive:
         with self.connect() as db:
             return [dict(r) for r in db.execute('SELECT * FROM check_runs ORDER BY id DESC LIMIT ?',(limit,))]
 
+    def latest_attempt(self):
+        """The most recent check, including one that could not read any meeting page."""
+        with self.connect() as db:
+            r=db.execute("SELECT * FROM check_runs WHERE kind='check' AND finished IS NOT NULL ORDER BY id DESC LIMIT 1").fetchone()
+        return dict(r) if r else None
+
     def latest_check(self):
         with self.connect() as db:
             r=db.execute("SELECT * FROM check_runs WHERE kind IN ('check','fetch') AND meetings>0 ORDER BY id DESC LIMIT 1").fetchone()
@@ -574,14 +603,20 @@ class Archive:
             browser=pw.chromium.launch(headless=True)
             try:
                 page=browser.new_page()
+                def go(url):
+                    try:return page.goto(url,wait_until='domcontentloaded',timeout=timeout)
+                    except Exception as e:raise RuntimeError(plain_error(e)) from None
                 def links(url):
                     if not allowed(url): raise ValueError('Council link points outside configured committee site.')
-                    response=page.goto(url,wait_until='domcontentloaded',timeout=timeout)
+                    response=go(url)
                     if response and response.status in (403,429):
                         # Sites can briefly refuse a burst of requests: pause, then try once more.
-                        time.sleep(30); response=page.goto(url,wait_until='domcontentloaded',timeout=timeout)
-                    if response and response.status>=400: raise RuntimeError(f'HTTP {response.status}')
-                    html=page.content(); time.sleep(delay)
+                        time.sleep(30); response=go(url)
+                    html=page.content()
+                    if response and response.status>=400:
+                        challenge=any(mark in html.lower() for mark in ('azure waf','js challenge','just a moment','cf-chl'))
+                        raise RuntimeError(f'HTTP {response.status}'+(': '+BOT_CHECK if challenge else ''))
+                    time.sleep(delay)
                     if not reader.meeting(page.url):resolve(self,url)
                     return [(canonical(u),t) for u,t in parse_links(html,page.url)+reader.extra_links(html,page.url) if allowed(u)]
                 yield page,links,allowed
@@ -606,7 +641,7 @@ class Archive:
         try:
             found=reader.discover(self.profile['meetings_url'],links,log,failures,skip=skip,pagination=full)
         except RuntimeError as e:
-            failures.append(str(e));found={}
+            failures.append(BLOCKED_ADVICE if blocked(failures) else str(e));found={}
         if full:
             with self.connect() as db:
                 for row in db.execute('SELECT meeting_url,committee,meeting FROM observations'):
@@ -667,8 +702,14 @@ class Archive:
                     if unknown:log(f'{unknown} meeting(s) have unreadable dates and were left out of the date range.')
                     if not chosen:raise ValueError('No meetings match these choices. Widen the dates or choose other committees.')
                     log(f'Checking {len(chosen)} meeting page(s) for papers…')
+                    refused_pages=0
                     for i,m in enumerate(chosen,1):
                         if should_stop():stopped=True;break
+                        if refused_pages>=REFUSAL_LIMIT and not summary['meetings']:
+                            # Every page so far was refused: waiting on the rest would take hours and prove nothing.
+                            summary['note']=f'The council website refused the first {refused_pages} meeting pages, so the check stopped. Try again later.'
+                            log(summary['note']+' If the website opens normally in your own browser, it may be blocking automated tools.')
+                            break
                         progress(dict(phase='Checking meeting pages',total=len(chosen),completed=i-1,current=f"{m['committee']} · {m['label']}"))
                         failures.context=dict(committee=m['committee'],meeting=m['label'],meeting_url=m['url'])
                         try:
@@ -698,7 +739,9 @@ class Archive:
                                 if added:log(f"{added} new paper(s) since the previous check: {m['committee']} · {m['label']}")
                             for u,t in found:
                                 docs.setdefault(u,dict(title=t or 'Council paper',committee=m['committee'],meeting=m['label'],meeting_url=m['url']))
-                        except Exception as e:failures.append(f"{m['url']}: {e}")
+                        except Exception as e:
+                            failures.append(f"{m['url']}: {e}")
+                            refused_pages=refused_pages+1 if blocked([str(e)]) else 0
                     progress(dict(phase='Checking meeting pages',total=len(chosen),completed=summary['meetings']))
                 paths=[];refused=False
                 if download and docs and not stopped:
@@ -830,7 +873,7 @@ class Archive:
                     elif response.ok:refusals=0
                     if response.status in (403,429) and refusals==REFUSAL_LIMIT:
                         log('The council website is still refusing downloads. The remaining papers will be tried again at a later check.')
-                    if challenged: raise RuntimeError(f"HTTP {response.status}: the website's bot protection asked for a browser check, which this app does not attempt")
+                    if challenged: raise RuntimeError(f'HTTP {response.status}: {BOT_CHECK}')
                     if not response.ok: raise RuntimeError(f'HTTP {response.status}')
                     body=response.body()
                     if not body: raise RuntimeError('Empty response from council document link')
@@ -862,7 +905,7 @@ class Archive:
                         (url,rel,m['title'],m['committee'],m['meeting'],datetime.now().isoformat()))
                 if i%10==0: log(f'Downloads: {counts["new"]} new, {counts["existing"]} already saved.')
             except Exception as e:
-                counts['failed']+=1; failures.append(f'{url}: {e}')
+                counts['failed']+=1; failures.append(f'{url}: {plain_error(e)}')
         progress(dict(phase='Downloading papers',total=len(discovered),completed=len(discovered)))
         log(f'Downloads: {counts["new"]} new, {counts["existing"]} already saved, {counts["changed"]} replaced, {counts["failed"]} failed'
             +(f', {counts["postponed"]} postponed' if counts['postponed'] else '')+'.')
