@@ -42,6 +42,10 @@ def initialise(a):
         CREATE VIRTUAL TABLE IF NOT EXISTS decision_text USING fts5(url UNINDEXED, title, body);
         CREATE INDEX IF NOT EXISTS decisions_seen ON decisions(first_seen);
         ''')
+        if 'loaded' not in [r[1] for r in db.execute('PRAGMA table_info(decisions)')]:
+            # When a notice came from a page saved by hand rather than from a check of the website.
+            db.execute("ALTER TABLE decisions ADD COLUMN loaded TEXT DEFAULT ''")
+    saved_folder(a).mkdir(parents=True, exist_ok=True)
 
 
 # ---- Reading the council's pages ----
@@ -245,7 +249,8 @@ def check(a, log, progress=None, should_stop=None, full=False, auto=False, downl
             try:
                 links(url); html = page.content()
             except Exception as e:
-                failures.append(f'{url}: {plain_error(e)}'); raise RuntimeError('Could not read the officer decisions register: ' + plain_error(e)) from None
+                failures.append(f'{url}: {plain_error(e)}'); raise RuntimeError('Could not read the officer decisions register: ' + plain_error(e)
+                    + '. If the register opens in your own browser, save its pages yourself and use "Add pages you saved yourself" on the Officer decisions tab.') from None
             if not register(html): raise RuntimeError(NO_REGISTER.format(url=url))
             resolve(a, url)
             found = [x for x in parse_list(html, page.url) if allowed(x[0])]
@@ -316,6 +321,127 @@ def attachments(a):
     return {u: m for u, m in docs.items() if u not in saved}
 
 
+# ---- Pages saved by hand ----
+
+SAVED_FROM = re.compile(r'<!--\s*saved from url=\(\d+\)(\S+?)\s*-->', re.I)
+
+
+def saved_folder(a):
+    """Where to put officer decision pages and PDFs saved from your own browser."""
+    return a.root / 'data' / 'saved_decisions'
+
+
+def read_saved(path):
+    raw = path.read_bytes()
+    for encoding in ('utf-8-sig', 'cp1252'):
+        try: return raw.decode(encoding)
+        except UnicodeDecodeError: pass
+    return raw.decode('utf-8', errors='replace')
+
+
+def saved_url(html, path, home, titles):
+    """The council address of a saved notice: from the browser's 'saved from' note, the file name, or the title
+    on a saved register page. '' if none of these identifies it."""
+    from archive import canonical
+    m = SAVED_FROM.search(html[:3000])
+    if m and is_decision(m.group(1)): return canonical(m.group(1))
+    n = re.fullmatch(r'(?:.*\bID[=_ -]?)?(\d{2,7})', path.stem.strip(), re.I)   # '3528' or '... ID=3528'
+    if n: return canonical(urljoin(home, f'ieDecisionDetails.aspx?ID={n.group(1)}'))
+    title = re.search(r'(?is)<h2[^>]*class="mgSubTitleTxt"[^>]*>(.*?)</h2>', html)
+    key = ' '.join(text(title.group(1)).lower().split()) if title else ''
+    return titles.get(key, '') if key else ''
+
+
+def load_saved(a, log, progress=None, should_stop=None):
+    """Read officer decision pages and PDFs saved by hand into data/saved_decisions (any sub-folders).
+
+    Register pages add the notices they list. Notice pages are read as a check would read them. A PDF is added
+    when its file name matches a document linked from a notice. Nothing is fetched from the council website.
+    Pages saved by hand carry no 'appeared between' evidence: the app did not see when they appeared."""
+    from archive import now, canonical, clean_filename
+    from urllib.parse import unquote
+    progress = progress or (lambda info: None); should_stop = should_stop or (lambda: False)
+    folder = saved_folder(a); folder.mkdir(parents=True, exist_ok=True)
+    home = a.profile['meetings_url']
+    files = sorted(p for p in folder.rglob('*') if p.is_file())
+    pages = [p for p in files if p.suffix.lower() in ('.html', '.htm', '.mhtml', '.mht')]
+    pdfs = [p for p in files if p.suffix.lower() == '.pdf']
+    summary = dict(listed=0, read=0, changed=0, pdfs=0, skipped=[])
+    if not pages and not pdfs:
+        log(f'No saved pages found. Save officer decision pages from your browser into {folder}, then try again.')
+        return summary
+    loaded = now()
+    with a.connect() as db:
+        run = db.execute('INSERT INTO check_runs(started,kind,scope) VALUES(?,?,?)', (loaded, 'decisions', 'Officer decisions, pages saved by hand')).lastrowid
+    texts = {}
+    for p in pages:
+        if p.suffix.lower() in ('.mhtml', '.mht'):
+            summary['skipped'].append(f'{p.name}: saved as a single file (.mhtml). Save as "Webpage, HTML only" instead.'); continue
+        texts[p] = read_saved(p)
+    # Register pages first, so notice pages can be matched to them by title.
+    for p, html in texts.items():
+        if not register(html): continue
+        m = SAVED_FROM.search(html[:3000])
+        found = parse_list(html, m.group(1) if m else home)
+        with a.connect() as db:
+            for url, title, shown in found:
+                cur = db.execute("INSERT OR IGNORE INTO decisions(url,number,title,listed_date,first_seen,loaded) VALUES(?,?,?,?,?,?)",
+                                 (url, number(url), title, shown, loaded, loaded))
+                summary['listed'] += cur.rowcount
+        log(f'{p.name}: register page listing {len(found)} notice(s).')
+    with a.connect() as db:
+        titles = {' '.join((r['title'] or '').lower().split()): r['url'] for r in db.execute('SELECT url,title FROM decisions')}
+    notices = [(p, html) for p, html in texts.items() if not register(html)]
+    for i, (p, html) in enumerate(notices, 1):
+        if should_stop(): break
+        progress(dict(phase='Reading saved notice pages', total=len(notices), completed=i - 1, current=p.name))
+        url = saved_url(html, p, home, titles)
+        notice = parse_notice(html, url or home)
+        if not notice['recognised']:
+            summary['skipped'].append(f'{p.name}: not an officer decision notice or register page.'); continue
+        if not url:
+            summary['skipped'].append(f'{p.name}: could not tell which notice this is. Save the register page that lists it into the same folder, or put the decision number in the file name, for example 3528.html.'); continue
+        with a.connect() as db:
+            db.execute("INSERT OR IGNORE INTO decisions(url,number,title,listed_date,first_seen,loaded) VALUES(?,?,?,?,?,?)",
+                       (url, number(url), notice['title'], notice['decided'], loaded, loaded))
+        result = record_notice(a, url, notice, html, loaded)
+        summary['read'] += 1; summary['changed'] += result == 'changed'
+    # PDFs: match on the file name in the document's address, as a browser names a downloaded file.
+    if pdfs:
+        wanted = {}
+        with a.connect() as db:
+            for r in db.execute("SELECT url,number,title,decided,listed_date,documents FROM decisions WHERE documents<>'[]'"):
+                for d in json.loads(r['documents']):
+                    name = unquote(urlparse(d['url']).path.rsplit('/', 1)[-1]).lower()
+                    wanted.setdefault(name, (d, dict(r)))
+        out = a.root / 'data' / 'raw_documents' / 'web_downloads'; out.mkdir(parents=True, exist_ok=True)
+        paths = []
+        for p in pdfs:
+            match = wanted.get(p.name.lower())
+            if not match:
+                summary['skipped'].append(f'{p.name}: no saved notice links to a PDF with this name, so it was left alone.'); continue
+            d, r = match
+            if not p.read_bytes()[:5] == b'%PDF-':
+                summary['skipped'].append(f'{p.name}: not a PDF file.'); continue
+            label = paper(r); title = d['title'] or r['title']
+            target = out / (hashlib.sha256(d['url'].encode()).hexdigest()[:20] + '_' + clean_filename(title)[:80] + '.pdf')
+            target.write_bytes(p.read_bytes())
+            rel = target.relative_to(a.root).as_posix(); paths.append(rel)
+            with a.connect() as db:
+                db.execute('INSERT OR REPLACE INTO downloads VALUES(?,?,?,?,?,?)',
+                           (d['url'], rel, title, label['committee'], label['meeting'], datetime.now().isoformat()))
+            summary['pdfs'] += 1
+        if paths: progress({}); a.index(log, only=paths)
+    with a.connect() as db:
+        db.execute('UPDATE check_runs SET finished=?,meetings=?,added=?,downloaded=?,failed=?,note=? WHERE id=?',
+                   (now(), summary['read'], summary['listed'], summary['pdfs'], len(summary['skipped']), 'Loaded from saved pages', run))
+    for s in summary['skipped']: log('Not loaded: ' + s)
+    log(f"Saved pages loaded: {summary['listed']} notice(s) added from register pages, {summary['read']} notice page(s) read"
+        + (f", {summary['changed']} changed" if summary['changed'] else '') + f", {summary['pdfs']} PDF(s) added to your archive"
+        + (f"; {len(summary['skipped'])} file(s) not loaded (see above)" if summary['skipped'] else '') + '.')
+    return summary
+
+
 # ---- What the tab shows ----
 
 def days_between(first, second):
@@ -344,7 +470,7 @@ def listing(a, window='all', query='', watch=(), watched=False, key_only=False, 
     run = latest_run(a)
     where = []; args = []
     if window == 'latest':
-        if not run: return dict(decisions=[], total=0, run=None, tracked=tracked(a), mentions=0)
+        if not run: return dict(decisions=[], total=0, run=None, tracked=tracked(a), mentions=0, folder=str(saved_folder(a)), register=urljoin(a.profile['meetings_url'], 'mgListOfficerDecisions.aspx?bcr=1&BAM=0'))
         where.append('first_seen>=? AND first_seen<=?'); args += [run['started'], run['finished']]
     elif window in ('7d', '30d', '90d'):
         days = int(window[:-1]); where.append('first_seen>=?')
@@ -372,6 +498,8 @@ def listing(a, window='all', query='', watch=(), watched=False, key_only=False, 
         if slow_only and not (r['gap_days'] is not None and r['gap_days'] >= SLOW_DAYS): continue
         if lag_only and not r['lag']: continue
         result.append(r)
-    return dict(decisions=result[:limit], total=len(result), run=run, tracked=tracked(a),
+    with a.connect() as db: known = bool(db.execute('SELECT 1 FROM decisions LIMIT 1').fetchone())
+    return dict(decisions=result[:limit], total=len(result), run=run, tracked=tracked(a) or known, folder=str(saved_folder(a)),
+                register=urljoin(a.profile['meetings_url'], 'mgListOfficerDecisions.aspx?bcr=1&BAM=0'),
                 mentions=sum(bool(r['watch']) for r in result), slow_days=SLOW_DAYS,
                 unread=sum(1 for r in rows if not r['read']))

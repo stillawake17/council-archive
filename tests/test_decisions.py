@@ -162,4 +162,42 @@ class CheckTests(unittest.TestCase):
             self.assertIn('did not show an officer decisions register',str(e.exception))
             self.assertFalse(decisions.tracked(a))
 
+class SavedPageTests(unittest.TestCase):
+    """Pages saved by hand from a browser, for when the council website refuses the app."""
+    def test_load_saved_pages_and_pdfs(self):
+        import io
+        from pypdf import PdfWriter
+        with tempfile.TemporaryDirectory() as tmp:
+            a=Archive(tmp);folder=decisions.saved_folder(a)
+            self.assertTrue(folder.is_dir())
+            (folder/'ModernGov - bristol.gov.uk.html').write_text(page('bristol-officer-decisions.html'),encoding='utf-8')
+            # Named by the browser after the page title, with nothing to say which notice it is: matched by its title.
+            (folder/'ModernGov - bristol.gov.uk (1).html').write_text(page('bristol-decision-3528.html'),encoding='utf-8')
+            # Chrome's note of where a page came from.
+            (folder/'notice.html').write_text('<!-- saved from url=(0063)'+notice_url(3522)+' -->\n'+page('bristol-decision-3522.html'),encoding='utf-8')
+            sub=folder/'more';sub.mkdir()
+            (sub/'3408.html').write_text(page('bristol-decision-3408.html'),encoding='cp1252')
+            (sub/'ModernGov - bristol.gov.uk (2).html').write_text(page('bristol-decision-3408.html').replace('Hyper-V 3-tier','Something unlisted'),encoding='utf-8')
+            w=PdfWriter();w.add_blank_page(100,100);buf=io.BytesIO();w.write(buf)
+            (folder/'ODN Public Participation and Conduct Procedure.pdf').write_bytes(buf.getvalue())
+            (folder/'unrelated.pdf').write_bytes(buf.getvalue())
+            log=[];s=decisions.load_saved(a,log.append)
+            self.assertEqual((s['listed'],s['read'],s['pdfs']),(13,3,1))
+            self.assertEqual(len(s['skipped']),2)                      # the unmatched notice page and the unrelated PDF
+            self.assertTrue(any('could not tell which notice' in x for x in s['skipped']))
+            d={r['number']:r for r in decisions.listing(a)['decisions']}
+            self.assertEqual(d[3528]['maker'],'Director: Management of Place')
+            self.assertEqual(d[3408]['gap_days'],24)
+            self.assertEqual(d[3528]['previous_check'],'');self.assertTrue(d[3528]['loaded'])   # no 'appeared between' from saved pages
+            self.assertIsNotNone(d[3522]['documents'][0]['doc_id'])                              # the PDF is in the archive and searchable
+            self.assertEqual(a.search('',['Officer decisions'])['total'],1)
+            self.assertFalse(decisions.tracked(a));self.assertTrue(decisions.listing(a)['tracked'])
+            again=decisions.load_saved(a,log.append)                   # loading again changes nothing
+            self.assertEqual((again['listed'],again['changed']),(0,0))
+    def test_empty_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a=Archive(tmp);log=[]
+            self.assertEqual(decisions.load_saved(a,log.append)['read'],0)
+            self.assertIn('No saved pages found',log[-1])
+
 if __name__=='__main__':unittest.main()
