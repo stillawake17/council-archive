@@ -34,7 +34,8 @@ lock=threading.Lock()
 stop_requested=threading.Event()
 AUTO_HOURS=(0,3,6,12,24)
 LABELS={'check':'Checking for new papers','fetch':'Downloading papers','rescan':'Refreshing the full meeting list',
-        'index':'Adding saved PDFs to search','ocr':'Reading scanned pages','sitecheck':'Checking website connection'}
+        'index':'Adding saved PDFs to search','ocr':'Reading scanned pages','sitecheck':'Checking website connection',
+        'decisions':'Checking officer decisions','decisionsall':'Fetching all past officer decisions'}
 
 def progress(info):
     with lock:state['progress']=dict(info)
@@ -116,11 +117,18 @@ def work(action,key,data=None,auto=False):
             ocr.run(a,log,progress,stop_requested.is_set)
         elif action=='sitecheck':a.site_check(log)
         elif action=='rescan':a.rescan(log)
+        elif action in ('decisions','decisionsall'):
+            import decisions
+            decisions.check(a,log,progress,stop_requested.is_set,full=action=='decisionsall',auto=auto)
         else:
             a.collect(log,progress,stop_requested.is_set,committees=data.get('committees') or [],
                 date_from=data.get('date_from',''),date_to=data.get('date_to',''),meetings=data.get('meetings') or [],
                 urls=data.get('urls') or [],download=bool(data.get('download',action=='fetch')),
                 refresh=bool(data.get('refresh',True)),recheck=bool(data.get('recheck',False)),auto=auto,scope=scope_text(data))
+            import decisions
+            if auto and action=='check' and profiles[key].get('auto_decisions',True) and a.profile.get('system')=='moderngov' and decisions.tracked(a) and not stop_requested.is_set():
+                # Automatic checks also cover officer decisions, once this archive has started tracking them.
+                decisions.check(a,log,progress,stop_requested.is_set,auto=True,download=bool(data.get('download',True)))
     except Exception as e:log('Stopped: '+str(e))
     finally:
         with lock:state['running']=False
@@ -199,7 +207,7 @@ class Handler(BaseHTTPRequestHandler):
                 result.update(a.stats());result['root']=str(a.root);result['name']=profiles[key]['name'];result.update(a.storage())
                 result.update(latest_check=a.latest_check(),latest_attempt=a.latest_attempt(),new_unsaved=a.news_count(),
                     auto_check_hours=profiles[key].get('auto_check_hours',0),auto_download=profiles[key].get('auto_download',True),
-                    watch=profiles[key].get('watch',[]))
+                    watch=profiles[key].get('watch',[]),system=a.profile.get('system',''),auto_decisions=profiles[key].get('auto_decisions',True))
                 self.respond(result)
             elif p.path=='/api/search':self.respond(a.search(one('q'),q.get('committee',[]),max(0,int(one('offset','0'))),one('issues')=='1',one('date_from'),one('date_to'),one('sort','relevance')))
             elif p.path=='/api/committees':self.respond(a.committees())
@@ -210,6 +218,10 @@ class Handler(BaseHTTPRequestHandler):
             elif p.path=='/api/late':
                 from late import report
                 self.respond(report(a,q.get('committee',[]),valid_date(one('date_from')),valid_date(one('date_to'))))
+            elif p.path=='/api/decisions':
+                import decisions
+                self.respond(decisions.listing(a,one('window','all'),one('q'),profiles[key].get('watch',[]),one('watched')=='1',
+                    one('key')=='1',one('slow')=='1',one('lag')=='1'))
             elif p.path=='/api/removals':self.respond(a.removals())
             elif p.path=='/api/runs':self.respond(a.runs())
             elif p.path=='/api/ocr':
@@ -294,16 +306,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(a.lookup(strings(data.get('urls') or [],5000,'paper')))
             with lock:
                 if action=='stop':
-                    if not state['running'] or data.get('council')!=state['council'] or state.get('action') not in ('ocr','check','fetch'):
+                    if not state['running'] or data.get('council')!=state['council'] or state.get('action') not in ('ocr','check','fetch','decisions','decisionsall'):
                         return self.respond({'error':'Nothing that can be stopped is running for this council.'},409)
                     stop_requested.set()
                     return self.respond({'stopping':True})
                 if action=='settings':
                     key=data.get('council','')
                     if key not in profiles:raise ValueError('Choose a council first.')
-                    hours=int(data.get('auto_check_hours',0))
-                    if hours not in AUTO_HOURS:raise ValueError('Choose a supported check interval.')
-                    profiles[key].update(auto_check_hours=hours,auto_download=bool(data.get('auto_download',True)));save()
+                    if 'auto_check_hours' in data:
+                        hours=int(data.get('auto_check_hours',0))
+                        if hours not in AUTO_HOURS:raise ValueError('Choose a supported check interval.')
+                        profiles[key].update(auto_check_hours=hours,auto_download=bool(data.get('auto_download',True)))
+                    if 'auto_decisions' in data:profiles[key]['auto_decisions']=bool(data['auto_decisions'])
+                    save()
                     return self.respond(profiles[key])
                 if action=='watch':
                     key=data.get('council','')
