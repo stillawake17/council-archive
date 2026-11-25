@@ -136,6 +136,8 @@ class Archive:
         initialise(self)
         import ocr
         ocr.initialise(self)
+        import decisions
+        decisions.initialise(self)
         self.repair_names()
         self.reader_changes()
 

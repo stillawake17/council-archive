@@ -15,7 +15,7 @@ for package in ('playwright', 'pypdfium2', 'pypdfium2_raw'):
     datas += d; binaries += b; hiddenimports += h
 
 a = Analysis([str(root/'app.py')], pathex=[str(root)], binaries=binaries, datas=datas,
-             hiddenimports=hiddenimports + ['ocr', 'ocr_worker', 'late', 'problems', 'exports', 'planning', 'readers'],
+             hiddenimports=hiddenimports + ['ocr', 'ocr_worker', 'late', 'problems', 'exports', 'planning', 'readers', 'decisions'],
              excludes=['tkinter', 'tests'])
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name='Council Archive', console=True,

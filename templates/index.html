@@ -170,6 +170,7 @@ main>p.muted{text-align:center;margin-top:24px}
 <button data-view="browse">Committees &amp; meetings</button>
 <button data-view="search">Search</button>
 <button data-view="late">Late &amp; removed</button>
+<button data-view="decisions" id="decisionstab">Officer decisions</button>
 <button data-view="tools">Tools</button>
 </nav>
 
@@ -255,6 +256,36 @@ main>p.muted{text-align:center;margin-top:24px}
 <p id="removedsummary" class="muted"></p>
 <div id="removedlist"></div>
 <p class="muted" style="margin-top:12px">A paper is listed here when it was on a meeting page at one check and missing at a later one. Papers saved before they were removed stay in your archive. A removal is not proof of wrongdoing: councils replace papers with corrected versions, and normally take the agenda pack off the page after the meeting. Removals are detected from now on, each time a meeting page is checked again.</p>
+</section></section>
+
+<!-- OFFICER DECISIONS -->
+<section id="view-decisions" hidden>
+<section class="panel">
+<h2>Check the officer decisions register</h2>
+<p class="muted" id="decisionintro">Officer decision notices record decisions made by council officers under delegated powers. Each notice is a web page on the council site, and a few have PDFs attached. The app saves the text of each notice, makes it searchable here, and saves any attached PDFs into your archive under “Officer decisions”.</p>
+<div class="bar">
+<button id="decisionscheck">Check officer decisions</button>
+<button class="secondary" id="decisionsall">Fetch all past decisions (slow)</button>
+<label class="bar" style="gap:6px"><input type="checkbox" id="autodecisions"> Include officer decisions in automatic checks</label>
+</div>
+<p class="muted" id="decisionstatus"></p>
+<p class="muted">A normal check reads the register for notices published in the last 90 days, then reads each notice not seen before. Notices published in the last two weeks are read again, so edits and status changes are noticed. Fetching all past decisions reads every notice back to the start of the register, about one page a second.</p>
+</section>
+<section class="panel">
+<div class="bar" style="align-items:flex-end">
+<div class="grow"><label class="field" for="decisionq">Search notices</label><input id="decisionq" type="search" placeholder='Try contract or "direct award"' style="width:100%"></div>
+<div><label class="field" for="decisionwindow">Show</label><select id="decisionwindow"><option value="all">All notices in my archive</option><option value="latest">Found by the latest check</option><option value="7d">Found in the last 7 days</option><option value="30d">Found in the last 30 days</option><option value="90d">Found in the last 90 days</option></select></div>
+<button class="secondary" id="decisioncsv">Save list (.csv)</button>
+</div>
+<div class="bar" style="margin-top:8px">
+<label class="bar" style="gap:6px"><input type="checkbox" id="decisionwatched"> Only notices mentioning my watch-words</label>
+<label class="bar" style="gap:6px"><input type="checkbox" id="decisionkey"> Only key decisions</label>
+<label class="bar" style="gap:6px"><input type="checkbox" id="decisionslow"> Only notices published 7 or more days after the decision</label>
+<label class="bar" style="gap:6px"><input type="checkbox" id="decisionlag"> Only notices missing from the register after their stated publication date</label>
+</div>
+<p id="decisionsummary" class="muted"></p>
+<div id="decisionlist"></div>
+<p class="muted" style="margin-top:12px">“Appeared between” uses this archive's own checks of the register: the notice was absent at one check and present at the next. A check only counts if it covered the notice's publication date. “Missing after its publication date” means a check made after the date printed on the notice did not find it. The gap between decision and publication is worked out from the two dates printed on the notice. None of these is proof that a rule was broken. Watch-words are set on the New papers tab.</p>
 </section></section>
 
 <!-- TOOLS -->
@@ -449,12 +480,14 @@ async function status(){
       else $('jobtext').textContent=r?'Last checked '+ago(r.started)+': '+plural(r.added,'new paper')+(r.baseline?' (+'+r.baseline+' on newly checked meetings)':'')+', '+r.downloaded+' downloaded'+(r.failed?', '+plural(r.failed,'problem'):''):'No checks yet. Choose Check now to look for new papers.';
       if(wasRunning)$('jobdetail').textContent=last.replace(/^\S+\s+/,'');
     }
-    $('stopjob').hidden=!(d.running&&mine&&['ocr','check','fetch'].includes(d.action));$('stopjob').disabled=d.stop_requested;
-    for(const id of['checknow','browsecheck','browsefetch','browsezip','trayfetch','rescan','index','sitecheck','runocr','retrypapers','retrymeetings'])$(id).disabled=d.running;for(const b of document.querySelectorAll('.jobbtn'))b.disabled=d.running;
+    $('stopjob').hidden=!(d.running&&mine&&['ocr','check','fetch','decisions','decisionsall'].includes(d.action));$('stopjob').disabled=d.stop_requested;
+    for(const id of['checknow','browsecheck','browsefetch','browsezip','trayfetch','rescan','index','sitecheck','runocr','retrypapers','retrymeetings','decisionscheck','decisionsall'])$(id).disabled=d.running;for(const b of document.querySelectorAll('.jobbtn'))b.disabled=d.running;
     const badge=$('newbadge');badge.hidden=!d.new_unsaved;badge.textContent=d.new_unsaved;
     document.title=(d.new_unsaved?'('+d.new_unsaved+') ':'')+'Council archive';
     if(document.activeElement!==$('watchterms')&&!watchDirty){$('watchterms').value=(d.watch||[]).join('\n')}
     $('watchcount').textContent=(d.watch||[]).length?'('+d.watch.length+' set)':'(none set)';
+    const mg=d.system==='moderngov';$('decisionstab').hidden=!mg;if(!mg&&view==='decisions')show('new');
+    if(document.activeElement!==$('autodecisions'))$('autodecisions').checked=d.auto_decisions!==false;
     if(document.activeElement!==$('autohours')){$('autohours').value=String(d.auto_check_hours);$('autodownload').checked=d.auto_download}
     const logText=d.messages.join('\n')||'No activity in this session.',sel=window.getSelection();
     if($('log').textContent!==logText&&!(sel&&!sel.isCollapsed&&$('log').contains(sel.anchorNode))){$('log').textContent=logText;$('log').scrollTop=$('log').scrollHeight}
@@ -463,7 +496,7 @@ async function status(){
     wasRunning=d.running;
   }catch(e){$('jobtext').textContent='Cannot reach the archive. Check that the launcher window is still open.'}
 }
-async function afterJob(){if(zipAfterJob){const z=zipAfterJob;zipAfterJob=null;await zipMeetings(z.meetings,z.name)}await loadCommittees();await refreshPickedIds();if(view==='new')loadNews();if(view==='browse')loadMeetings();if(view==='search')search();if(view==='late'){loadLate();loadRemoved()}if(view==='tools')loadTools()}
+async function afterJob(){if(zipAfterJob){const z=zipAfterJob;zipAfterJob=null;await zipMeetings(z.meetings,z.name)}await loadCommittees();await refreshPickedIds();if(view==='new')loadNews();if(view==='browse')loadMeetings();if(view==='search')search();if(view==='late'){loadLate();loadRemoved()}if(view==='decisions')loadDecisions();if(view==='tools')loadTools()}
 $('stopjob').onclick=async()=>{try{await post('stop',{council:status0.job_council});await status()}catch(e){$('notice').textContent=e.message}};
 
 // ---------- NEW PAPERS ----------
@@ -617,6 +650,54 @@ searchPicker.onchange=()=>{offset=0;search()};
 $('prev').onclick=()=>{offset=Math.max(0,offset-30);search()};$('next').onclick=()=>{offset+=30;search()};
 $('searchselect').onclick=()=>{for(const r of searchResults)selectPaper({url:r.url,doc_id:r.id,title:r.title},true);refreshTray()};
 
+// ---------- OFFICER DECISIONS ----------
+let decisionsShown=[],decisionSeq=0;
+function ukDay(s){return s&&/^\d{4}-\d{2}-\d{2}$/.test(s)?day(s):(s||'')}
+function decisionRow(r){
+  const card=el('article',undefined,'result'),row=el('div',undefined,'paper decision'),main=el('div');
+  const title=el('div',undefined,'title');title.append(link(r.title||('Decision '+r.number),r.url));
+  if(r.is_new)title.append(' ',el('span','New','pill new'));
+  if(r.key_decision.toLowerCase()==='yes')title.append(' ',el('span','Key decision','pill upcoming'));
+  if(r.lag)title.append(' ',el('span','Missing after publication date','pill late'));
+  if(r.missing_since)title.append(' ',el('span','No longer listed','pill missing'));
+  main.append(title);
+  const gap=r.gap_days===null||r.gap_days===undefined?'':r.gap_days===0?'published the same day':'published '+plural(r.gap_days,'day')+' after the decision';
+  main.append(el('div',[r.maker,r.decided?'Decided '+ukDay(r.decided):'',r.published?'Published '+ukDay(r.published):'',gap].filter(Boolean).join(' · '),'meta'));
+  main.append(el('div',[r.status,r.call_in?'Subject to call-in: '+r.call_in:'',r.read?'':'Notice not read yet'].filter(Boolean).join(' · '),'meta'));
+  main.append(el('div',appeared(r)+(r.lag?' · A check on '+when(r.previous_check)+' did not find it, although the notice says it was published on '+ukDay(r.published)+'.':''),'meta'));
+  if(r.changed)main.append(el('p','Changed on the council site '+when(r.changed)+(r.changes?': '+r.changes:'')+'. Earlier versions are kept in the archive folder.','warning'));
+  if(r.missing_since)main.append(el('p','Not on the register at the check made '+when(r.missing_since)+'. Your saved copy is kept.','warning'));
+  if(r.watch&&r.watch.length)main.append(el('p','Mentions: '+r.watch.join(', '),'excerpt'));
+  if(r.decision)main.append(el('p',r.decision.length>400?r.decision.slice(0,400)+'…':r.decision,'excerpt'));
+  if(r.purpose||r.alternatives||Object.keys(r.other||{}).length){const more=el('details'),sum=el('summary','Full notice text');more.append(sum);
+    for(const[k,v]of[['Purpose',r.purpose],['Decision',r.decision],['Alternative options considered',r.alternatives],...Object.entries(r.other||{})])if(v){more.append(el('h4',k),el('p',v))}
+    main.append(more)}
+  const acts=el('div',undefined,'actions');acts.append(link('Council site',r.url));
+  for(const d of r.documents||[]){if(d.doc_id)acts.append(link('Open '+cleanTitle(d.title).name,pdfUrl(d.doc_id)));else acts.append(link(cleanTitle(d.title).name+' (not in archive yet)',d.url))}
+  const spacer=el('span');row.append(spacer,main,acts);card.append(row);return card}
+async function loadDecisions(){
+  if(!council())return;const key=council(),seq=++decisionSeq;
+  try{const d=await get('/api/decisions',{window:$('decisionwindow').value,q:$('decisionq').value,watched:$('decisionwatched').checked?'1':'',key:$('decisionkey').checked?'1':'',slow:$('decisionslow').checked?'1':'',lag:$('decisionlag').checked?'1':''});
+    if(key!==council()||seq!==decisionSeq)return;
+    decisionsShown=d.decisions;const list=$('decisionlist');list.replaceChildren();
+    const r=d.run;$('decisionstatus').textContent=r?'Last checked '+ago(r.started)+': '+plural(r.added,'new notice')+', '+plural(r.meetings,'notice page')+' read'+(r.downloaded?', '+r.downloaded+' PDF(s) downloaded':'')+(r.failed?', '+plural(r.failed,'problem'):'')+(r.note?' · '+r.note:'')+'.':'Not checked yet. The first check records what is on the register now, as a starting point.';
+    if(!d.tracked){$('decisionsummary').textContent='';list.append(el('p','No officer decisions in your archive yet. Use Check officer decisions above.','muted'));return}
+    $('decisionsummary').textContent=plural(d.total,'notice')+' shown'+(d.total>d.decisions.length?' (first '+d.decisions.length+')':'')+((status0.watch||[]).length?', '+d.mentions+' mentioning your watch-words':'')+(d.unread?'. '+plural(d.unread,'notice')+' listed but not read yet; they are read at the next check.':'.');
+    if(!d.decisions.length){list.append(el('p','No notices match these choices.','muted'));return}
+    for(const x of d.decisions)list.append(decisionRow(x));
+  }catch(e){$('decisionsummary').textContent=e.message}
+}
+for(const id of['decisionwindow','decisionwatched','decisionkey','decisionslow','decisionlag'])$(id).onchange=loadDecisions;
+let decisionTimer;$('decisionq').oninput=()=>{clearTimeout(decisionTimer);decisionTimer=setTimeout(loadDecisions,300)};
+$('decisionscheck').onclick=()=>job('decisions');
+$('decisionsall').onclick=()=>{if(confirm('This reads every officer decision notice on the register, about one page a second. For Bristol that is over 1,300 pages, so it can take 30 minutes or more. You can stop it at any time and it carries on from where it stopped. Continue?'))job('decisionsall')};
+$('autodecisions').onchange=async()=>{try{await post('settings',{auto_decisions:$('autodecisions').checked});$('decisionstatus').textContent=$('autodecisions').checked?'Automatic checks will include officer decisions.':'Automatic checks will leave out officer decisions.'}catch(e){$('notice').textContent=e.message}};
+$('decisioncsv').onclick=()=>{const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const head=['Number','Title','Decision maker','Status','Key decision','Subject to call-in','Date of decision','Publication date','Days from decision to publication','First seen','Previous check','Missing after publication date','No longer listed since','Changed','Watch-words','Attached documents','Decision','Council page'];
+  const rows=decisionsShown.map(r=>[r.number,r.title,r.maker,r.status,r.key_decision,r.call_in,r.decided,r.published,r.gap_days,r.first_seen,r.previous_check,r.lag?'yes':'',r.missing_since,r.changed?(r.changed+' '+r.changes):'',(r.watch||[]).join('; '),(r.documents||[]).map(d=>d.url).join(' '),r.decision,r.url]);
+  const text='\ufeff'+[head,...rows].map(r=>r.map(q).join(',')).join('\r\n'),blob=new Blob([text],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=council()+'-officer-decisions-'+isoDay(new Date())+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+
 // ---------- LATE PAPERS ----------
 let lateShown=[];
 function day(s){return s?new Date(s+'T12:00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'}):''}
@@ -666,7 +747,7 @@ $('rescan').onclick=()=>job('rescan');$('index').onclick=()=>job('index');$('sit
 let problemRows=[],problemReport='';
 async function loadTools(){await Promise.all([refreshOCR(),loadProblems(),loadRuns(),loadReplacements()])}
 async function loadRuns(){try{const rows=await get('/api/runs');const t=$('runs');t.replaceChildren();
-  for(const r of rows){const tr=el('tr');for(const v of[when(r.started)+(r.auto?' (automatic)':''),r.kind==='fetch'?'Download selected papers':'Check meetings',r.scope,r.meetings,r.added+(r.baseline?' (+'+r.baseline+' first check)':''),r.downloaded,(r.failed||0)+(r.note?' · '+r.note:'')])tr.append(el('td',String(v)));t.append(tr)}
+  for(const r of rows){const tr=el('tr');for(const v of[when(r.started)+(r.auto?' (automatic)':''),r.kind==='fetch'?'Download selected papers':r.kind==='decisions'?'Check officer decisions':'Check meetings',r.scope,r.meetings,r.added+(r.baseline?' (+'+r.baseline+' first check)':''),r.downloaded,(r.failed||0)+(r.note?' · '+r.note:'')])tr.append(el('td',String(v)));t.append(tr)}
   if(!rows.length)t.append(Object.assign(el('tr'),{innerHTML:'<td colspan="7">No checks yet.</td>'}))}catch(e){}}
 async function loadProblems(){const key=council();try{problemRows=await get('/api/problems');if(key!==council())return;
   const name=$('council').selectedOptions[0]?.textContent||key;
@@ -689,9 +770,9 @@ async function refreshOCR(){const key=council();try{const d=await get('/api/ocr'
 
 // ---------- views, councils ----------
 function show(v){view=v;for(const b of document.querySelectorAll('nav.tabs button')){if(b.dataset.view===v)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}
-  for(const s of['new','browse','search','late','tools'])$('view-'+s).hidden=s!==v;
+  for(const s of['new','browse','search','late','decisions','tools'])$('view-'+s).hidden=s!==v;
   try{localStorage.setItem('archive-view',v)}catch(e){}
-  if(v==='new')loadNews();if(v==='browse')loadMeetings();if(v==='search')search();if(v==='late'){loadLate();loadRemoved()}if(v==='tools')loadTools()}
+  if(v==='new')loadNews();if(v==='browse')loadMeetings();if(v==='search')search();if(v==='late'){loadLate();loadRemoved()}if(v==='decisions')loadDecisions();if(v==='tools')loadTools()}
 for(const b of document.querySelectorAll('nav.tabs button'))b.onclick=()=>show(b.dataset.view);
 $('council').onchange=async()=>{watchDirty=false;picked.clear();pickedMeetings.clear();refreshTray();browseCommittee=null;offset=0;try{localStorage.setItem('archive-council',council())}catch(e){}$('notice').textContent='';await status();await loadCommittees();show(view)};
 async function councils(preferred){const d=await get('/api/councils');
