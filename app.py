@@ -35,7 +35,8 @@ stop_requested=threading.Event()
 AUTO_HOURS=(0,3,6,12,24)
 LABELS={'check':'Checking for new papers','fetch':'Downloading papers','rescan':'Refreshing the full meeting list',
         'index':'Adding saved PDFs to search','ocr':'Reading scanned pages','sitecheck':'Checking website connection',
-        'decisions':'Checking officer decisions','decisionsall':'Fetching all past officer decisions'}
+        'decisions':'Checking officer decisions','decisionsall':'Fetching all past officer decisions',
+        'decisionsload':'Loading saved officer decision pages'}
 
 def progress(info):
     with lock:state['progress']=dict(info)
@@ -120,6 +121,9 @@ def work(action,key,data=None,auto=False):
         elif action in ('decisions','decisionsall'):
             import decisions
             decisions.check(a,log,progress,stop_requested.is_set,full=action=='decisionsall',auto=auto)
+        elif action=='decisionsload':
+            import decisions
+            decisions.load_saved(a,log,progress,stop_requested.is_set)
         else:
             a.collect(log,progress,stop_requested.is_set,committees=data.get('committees') or [],
                 date_from=data.get('date_from',''),date_to=data.get('date_to',''),meetings=data.get('meetings') or [],
@@ -306,7 +310,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(a.lookup(strings(data.get('urls') or [],5000,'paper')))
             with lock:
                 if action=='stop':
-                    if not state['running'] or data.get('council')!=state['council'] or state.get('action') not in ('ocr','check','fetch','decisions','decisionsall'):
+                    if not state['running'] or data.get('council')!=state['council'] or state.get('action') not in ('ocr','check','fetch','decisions','decisionsall','decisionsload'):
                         return self.respond({'error':'Nothing that can be stopped is running for this council.'},409)
                     stop_requested.set()
                     return self.respond({'stopping':True})
