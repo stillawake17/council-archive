@@ -62,6 +62,28 @@ def items(a):
     with a.connect() as db:rows=[json.loads(r['payload']) for r in db.execute('SELECT payload FROM source_problems')]
     return sorted(rows,key=lambda r:r['last_failed'],reverse=True)
 
+def summary(a,limit=200):
+    """Counts plus the most recent few, so the page never has to draw thousands of entries."""
+    rows=items(a);categories={}
+    for r in rows:categories[r['category']]=categories.get(r['category'],0)+1
+    pages=sum(r['kind']=='Meeting page' for r in rows)
+    return dict(total=len(rows),papers=len(rows)-pages,pages=pages,
+                categories=sorted(categories.items(),key=lambda x:-x[1]),rows=rows[:limit])
+
+def report(a,name,prepared):
+    rows=items(a)
+    lines=[f'{name}: unavailable papers and meeting pages',f'List prepared: {prepared}','',
+           'These links failed when last checked. This does not establish that a document does not exist.']
+    for i,r in enumerate(rows,1):
+        lines+=['',f"{i}. {r['title']}"]+([f"Committee: {r['committee']}"] if r.get('committee') else [])+([f"Meeting: {r['meeting']}"] if r.get('meeting') else [])
+        lines+=[f"Problem: {r['category']}",f"Details: {r['reason']}",f"Last failure: {r['last_failed']}",f"Source: {r['url']}"]
+        if r.get('meeting_url'):lines.append(f"Meeting page: {r['meeting_url']}")
+    return '\n'.join(lines)+'\n'
+
+def retry_targets(a,pages=False,limit=2000):
+    """Addresses to try again: papers, or meeting pages."""
+    return [r['url'] for r in items(a) if (r['kind']=='Meeting page')==pages][:limit]
+
 class IssueList(list):
     def __init__(self,a,existing=()):super().__init__(existing);self.archive=a;self.context={}
     def append(self,message):

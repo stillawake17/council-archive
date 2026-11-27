@@ -101,6 +101,7 @@ def valid_date(value):
 def scope_text(data):
     committees=data.get('committees') or []
     who='all committees' if not committees else (committees[0] if len(committees)==1 else f'{len(committees)} committees')
+    if data.get('from_problems'):return 'unavailable papers, tried again' if data.get('download',True) and not data.get('meetings') else 'unavailable meeting pages, checked again'
     if data.get('urls'):return f"{len(data['urls'])} chosen paper(s)"
     if data.get('meetings'):return f"{len(data['meetings'])} chosen meeting(s)"
     when=' from '+data['date_from'] if data.get('date_from') else ''
@@ -130,6 +131,12 @@ def work(action,key,data=None,auto=False):
             import decisions
             decisions.load_saved(a,log,progress,stop_requested.is_set)
         else:
+            if data.get('from_problems'):
+                # The list can be far longer than the page could send, so the server picks the addresses.
+                from problems import retry_targets
+                if action=='fetch':data['urls']=retry_targets(a)
+                else:data['meetings']=retry_targets(a,pages=True,limit=3000)
+                if not (data['urls'] or data['meetings']):raise ValueError('Nothing to try again.')
             a.collect(log,progress,stop_requested.is_set,committees=data.get('committees') or [],
                 date_from=data.get('date_from',''),date_to=data.get('date_to',''),meetings=data.get('meetings') or [],
                 urls=data.get('urls') or [],download=bool(data.get('download',action=='fetch')),
@@ -160,7 +167,8 @@ def validate_job(action,data):
         data['urls']=strings(data.get('urls') or [],2000,'paper')
         data['date_from']=valid_date(data.get('date_from'));data['date_to']=valid_date(data.get('date_to'))
         if data['date_from'] and data['date_to'] and data['date_from']>data['date_to']:raise ValueError('The end date must follow the start date.')
-        if action=='fetch' and not (data['urls'] or data['meetings'] or data['committees'] or data['date_from'] or data['date_to']):
+        data['from_problems']=bool(data.get('from_problems'))
+        if action=='fetch' and not (data['urls'] or data['meetings'] or data['committees'] or data['date_from'] or data['date_to'] or data['from_problems']):
             raise ValueError('Choose papers, meetings or committees to download.')
     return data
 
@@ -243,8 +251,14 @@ class Handler(BaseHTTPRequestHandler):
                 import ocr
                 self.respond(ocr.details(a))
             elif p.path=='/api/problems':
-                from problems import items
-                self.respond(items(a))
+                from problems import summary
+                self.respond(summary(a,max(1,min(1000,int(one('limit','200'))))))
+            elif p.path=='/api/problems.txt':
+                from problems import report
+                body=report(a,profiles[key]['name'],datetime.now().strftime('%d %b %Y %H:%M')).encode('utf-8')
+                self.send_response(200);self.send_header('Content-Type','text/plain; charset=utf-8')
+                self.send_header('Content-Disposition',disposition(f"{key}-unavailable-papers-{date.today().isoformat()}.txt",one('download')=='1'))
+                self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
             elif p.path=='/api/replacements':
                 f=a.work/'replacements.jsonl'
                 self.respond([json.loads(x) for x in f.read_text().splitlines()][-500:][::-1] if f.exists() else [])

@@ -102,6 +102,21 @@ class RefusingWebsiteTests(unittest.TestCase):
             self.assertIn('refused the first',summary['note'])
             self.assertEqual(a.latest_attempt()['meetings'],0);self.assertIsNone(a.latest_check())
 
+class ProblemListTests(unittest.TestCase):
+    def test_summary_report_and_retry_targets_cope_with_long_lists(self):
+        import problems
+        with tempfile.TemporaryDirectory() as tmp:
+            a=Archive(tmp);f=IssueList(a)
+            for n in range(2500):f.append(f'https://council.test/{n}.pdf: '+archive.POSTPONED)
+            f.append('https://council.test/ieListDocuments.aspx?MId=9: HTTP 403')
+            s=problems.summary(a,200)
+            self.assertEqual((s['total'],s['papers'],s['pages'],len(s['rows'])),(2501,2500,1,200))
+            self.assertEqual(s['categories'][0],('Waiting to try again',2500))
+            self.assertEqual(len(problems.retry_targets(a)),2000)
+            self.assertEqual(problems.retry_targets(a,pages=True),['https://council.test/ielistdocuments.aspx?MId=9'.replace('ielistdocuments','ieListDocuments')])
+            text=problems.report(a,'Test Council','today')
+            self.assertIn('2501. ',text);self.assertTrue(text.startswith('Test Council: unavailable papers'))
+
 class InboxTests(unittest.TestCase):
     def test_files_are_filed_and_matched_to_known_papers(self):
         with tempfile.TemporaryDirectory() as tmp:

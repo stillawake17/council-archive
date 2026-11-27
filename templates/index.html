@@ -763,7 +763,7 @@ $('latecsv').onclick=()=>{const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
 
 // ---------- TOOLS ----------
 $('rescan').onclick=()=>job('rescan');$('index').onclick=()=>job('index');$('sitecheck').onclick=()=>job('sitecheck');$('runocr').onclick=()=>job('ocr');
-let problemRows=[],problemReport='';
+let problemCount=0;
 async function loadTools(){await Promise.all([refreshOCR(),loadProblems(),loadRuns(),loadReplacements(),loadInbox()])}
 let inboxMeetings=[];
 async function loadInbox(){const key=council();try{const d=await get('/api/inbox');if(key!==council())return;
@@ -790,17 +790,18 @@ $('inboxfile').onclick=()=>{const files=[...document.querySelectorAll('#inboxfil
 async function loadRuns(){try{const rows=await get('/api/runs');const t=$('runs');t.replaceChildren();
   for(const r of rows){const tr=el('tr');for(const v of[when(r.started)+(r.auto?' (automatic)':''),r.kind==='fetch'?'Download selected papers':r.kind==='decisions'?'Check officer decisions':'Check meetings',r.scope,r.meetings,r.added+(r.baseline?' (+'+r.baseline+' first check)':''),r.downloaded,(r.failed||0)+(r.note?' · '+r.note:'')])tr.append(el('td',String(v)));t.append(tr)}
   if(!rows.length)t.append(Object.assign(el('tr'),{innerHTML:'<td colspan="7">No checks yet.</td>'}))}catch(e){}}
-async function loadProblems(){const key=council();try{problemRows=await get('/api/problems');if(key!==council())return;
-  const name=$('council').selectedOptions[0]?.textContent||key;
-  problemReport=name+': unavailable papers and meeting pages\nList prepared: '+new Date().toLocaleString()+'\n\nThese links failed when last checked. This does not establish that a document does not exist.\n'+problemRows.map((r,i)=>'\n'+(i+1)+'. '+r.title+'\n'+(r.committee?'Committee: '+r.committee+'\n':'')+(r.meeting?'Meeting: '+r.meeting+'\n':'')+'Problem: '+r.category+'\nDetails: '+r.reason+'\nLast failure: '+r.last_failed+'\nSource: '+r.url+'\n'+(r.meeting_url?'Meeting page: '+r.meeting_url+'\n':'')).join('');
-  $('problemstatus').textContent=plural(problemRows.length,'unresolved problem')+'.';const box=$('problemitems');box.replaceChildren();$('problemcopy').hidden=true;
-  for(const r of problemRows){const item=el('article',undefined,'result');item.append(el('h3',cleanTitle(r.title).name),el('p',[r.kind,r.committee,r.meeting].filter(Boolean).join(' · '),'muted'),el('p',r.category+': '+r.reason,'warning'),el('p','Last failed '+when(r.last_failed)+(r.imported?' · imported from an old log':''),'muted'),link('Council link',r.url));box.append(item)}
-  $('retrypapers').hidden=!problemRows.some(r=>r.kind!=='Meeting page');$('retrymeetings').hidden=!problemRows.some(r=>r.kind==='Meeting page');
+async function loadProblems(){const key=council();try{const d=await get('/api/problems',{limit:200});if(key!==council())return;
+  problemCount=d.total;
+  $('problemstatus').textContent=plural(d.total,'unresolved problem')+(d.total?': '+d.categories.map(([c,n])=>n.toLocaleString()+' '+c.charAt(0).toLowerCase()+c.slice(1)).join(', ')+'.':'.')+(d.total>d.rows.length?' The '+d.rows.length+' most recent are shown; Save list has them all.':'');
+  const box=$('problemitems');box.replaceChildren();$('problemcopy').hidden=true;
+  for(const r of d.rows){const item=el('article',undefined,'result');item.append(el('h3',cleanTitle(r.title).name),el('p',[r.kind,r.committee,r.meeting].filter(Boolean).join(' · '),'muted'),el('p',r.category+': '+r.reason,'warning'),el('p','Last failed '+when(r.last_failed)+(r.imported?' · imported from an old log':''),'muted'),link('Council link',r.url));box.append(item)}
+  $('retrypapers').hidden=!d.papers;$('retrypapers').textContent=d.papers>2000?'Try 2,000 of these papers again':'Try these papers again';$('retrymeetings').hidden=!d.pages;
 }catch(e){$('problemstatus').textContent=e.message}}
-$('retrypapers').onclick=()=>job('fetch',{urls:problemRows.filter(r=>r.kind!=='Meeting page').map(r=>r.url),download:true});
-$('retrymeetings').onclick=()=>job('check',{meetings:problemRows.filter(r=>r.kind==='Meeting page').map(r=>r.url),download:true});
-$('copyproblems').onclick=async()=>{try{await navigator.clipboard.writeText(problemReport);$('problemstatus').textContent='List copied. You can paste it into a message to Democratic Services.'}catch(e){$('problemcopy').value=problemReport;$('problemcopy').hidden=false;$('problemcopy').select();$('problemstatus').textContent='Press Ctrl+C to copy.'}};
-$('saveproblems').onclick=()=>{const blob=new Blob([problemReport],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=council()+'-unavailable-papers-'+isoDay(new Date())+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+$('retrypapers').onclick=()=>job('fetch',{from_problems:true,download:true});
+$('retrymeetings').onclick=()=>job('check',{from_problems:true,download:true});
+$('copyproblems').onclick=async()=>{if(problemCount>500){$('problemstatus').textContent='The list is too long to copy ('+problemCount.toLocaleString()+' entries). Use Save list instead.';return}
+  let problemReport='';try{problemReport=await(await fetch('/api/problems.txt?'+qs())).text();await navigator.clipboard.writeText(problemReport);$('problemstatus').textContent='List copied. You can paste it into a message to Democratic Services.'}catch(e){$('problemcopy').value=problemReport;$('problemcopy').hidden=false;$('problemcopy').select();$('problemstatus').textContent='Press Ctrl+C to copy.'}};
+$('saveproblems').onclick=()=>{const a=document.createElement('a');a.href='/api/problems.txt?'+qs({download:'1'});a.download='';a.click()};
 async function loadReplacements(){try{const rows=await get('/api/replacements');const box=$('replacements');box.replaceChildren();if(!rows.length)box.append(el('p','None detected.','muted'));
   for(const r of rows){const item=el('p');item.append(document.createTextNode(when(r.detected)+' · '),link('Council PDF',r.url),el('span',' · previous copy kept at '+r.old_copy,'muted'));box.append(item)}}catch(e){}}
 let ocrSignature='';
