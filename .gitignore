@@ -22,3 +22,4 @@ backup-before-redesign/
 # Installer build output
 build/
 dist/
+Council-Archive-Setup-*.exe

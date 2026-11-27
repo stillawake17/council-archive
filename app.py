@@ -33,7 +33,7 @@ state={'running':False,'council':'','messages':[]}
 lock=threading.Lock()
 stop_requested=threading.Event()
 AUTO_HOURS=(0,3,6,12,24)
-LABELS={'check':'Checking for new papers','fetch':'Downloading papers','rescan':'Refreshing the full meeting list',
+LABELS={'inbox':'Filing papers you downloaded','check':'Checking for new papers','fetch':'Downloading papers','rescan':'Refreshing the full meeting list',
         'index':'Adding saved PDFs to search','ocr':'Reading scanned pages','sitecheck':'Checking website connection'}
 
 def progress(info):
@@ -115,6 +115,11 @@ def work(action,key,data=None,auto=False):
             import ocr
             ocr.run(a,log,progress,stop_requested.is_set)
         elif action=='sitecheck':a.site_check(log)
+        elif action=='inbox':
+            r=a.file_inbox(data['files'],data['committee'],data.get('meeting_url',''),data.get('meeting',''),data.get('date',''))
+            log(f"Filed {len(r['moved'])} paper(s) under {data['committee']}"+(f", {r['matched']} matched to papers listed on the meeting page" if data.get('meeting_url') else '')+f". Folder: {r['folder']}")
+            if r['skipped']:log(f"Left in the inbox (not a readable PDF, or already moved): {', '.join(r['skipped'])}")
+            if r['moved']:a.index(log,only=r['moved'])
         elif action=='rescan':a.rescan(log)
         else:
             a.collect(log,progress,stop_requested.is_set,committees=data.get('committees') or [],
@@ -132,6 +137,11 @@ def start(action,key,data,auto=False):
     threading.Thread(target=work,args=(action,key,data,auto),daemon=True).start()
 
 def validate_job(action,data):
+    if action=='inbox':
+        data['files']=strings(data.get('files') or [],2000,'file')
+        if not data['files']:raise ValueError('Choose at least one PDF from the inbox.')
+        if not str(data.get('committee','')).strip():raise ValueError('Choose a committee.')
+        data['date']=valid_date(data.get('date'))
     if action in ('check','fetch'):
         data['committees']=strings(data.get('committees') or [],500,'committee')
         data['meetings']=strings(data.get('meetings') or [],3000,'meeting')
@@ -211,6 +221,7 @@ class Handler(BaseHTTPRequestHandler):
                 from late import report
                 self.respond(report(a,q.get('committee',[]),valid_date(one('date_from')),valid_date(one('date_to'))))
             elif p.path=='/api/removals':self.respond(a.removals())
+            elif p.path=='/api/inbox':self.respond(dict(folder=str(a.inbox),files=a.inbox_files()))
             elif p.path=='/api/runs':self.respond(a.runs())
             elif p.path=='/api/ocr':
                 import ocr
@@ -314,6 +325,11 @@ class Handler(BaseHTTPRequestHandler):
                 if action=='add':
                     if state['running']:return self.respond({'error':'Wait for the current task to finish.'},409)
                     return self.respond(add_profile(data))
+                if action=='openinbox':
+                    a=archives.get(data.get('council',''))
+                    if not a:raise ValueError('Choose a council first.')
+                    os.startfile(str(a.inbox))
+                    return self.respond({'opened':True})
                 if action not in LABELS:raise ValueError('Unknown action.')
                 if state['running']:return self.respond({'error':'Wait for the current task to finish, or stop it.'},409)
                 key=data.get('council','')

@@ -1,7 +1,7 @@
 """Local council archive: incremental page-level search, meeting checks and paper downloads."""
 from pathlib import Path
 from contextlib import contextmanager
-from urllib.parse import urljoin, urlparse, parse_qsl, urlencode, urlunparse
+from urllib.parse import urljoin, urlparse, parse_qsl, urlencode, urlunparse, unquote
 import csv, hashlib, json, os, re, shutil, sqlite3, time
 from datetime import datetime, timezone, timedelta, date
 from pypdf import PdfReader
@@ -686,7 +686,7 @@ class Archive:
         summary=dict(meetings=0,added=0,baseline=0,downloaded=0,failed=0,postponed=0,removed=0,note='')
         with self.connect() as db:
             run=db.execute('INSERT INTO check_runs(started,kind,scope,auto) VALUES(?,?,?,?)',(now(),kind,scope,int(auto))).lastrowid
-        stopped=False
+        stopped=turned_away=False
         try:
             with self.browser() as (page,links,allowed):
                 docs={}
@@ -709,7 +709,7 @@ class Archive:
                             # Every page so far was refused: waiting on the rest would take hours and prove nothing.
                             summary['note']=f'The council website refused the first {refused_pages} meeting pages, so the check stopped. Try again later.'
                             log(summary['note']+' If the website opens normally in your own browser, it may be blocking automated tools.')
-                            break
+                            turned_away=True;break
                         progress(dict(phase='Checking meeting pages',total=len(chosen),completed=i-1,current=f"{m['committee']} · {m['label']}"))
                         failures.context=dict(committee=m['committee'],meeting=m['label'],meeting_url=m['url'])
                         try:
@@ -753,7 +753,7 @@ class Archive:
                         summary['downloaded']=counts['new']+counts['changed'];summary['failed']=counts['failed']
                         summary['postponed']=counts['postponed'];refused=counts['refused']
                     else:log('Every paper found is already in your archive.')
-                if download and not urls and not stopped:
+                if download and not urls and not stopped and not turned_away:
                     # Papers refused or timed out at earlier checks get another go, without being asked.
                     again={} if refused else self.retry_queue(skip=docs)
                     if again:
@@ -785,6 +785,48 @@ class Archive:
         if failures:parts.append(f'{len(failures)} problem(s) – see Tools › Unavailable papers')
         log(('Stopped: ' if stopped else 'Finished: ')+'; '.join(parts)+'.')
         return summary
+
+    # ---- Papers downloaded by hand ----
+
+    @property
+    def inbox(self):
+        """Where to save PDFs downloaded in your own browser, before filing them under a meeting."""
+        folder=self.root/'data'/'inbox';folder.mkdir(parents=True,exist_ok=True)
+        return folder
+
+    def inbox_files(self):
+        return [dict(name=p.name,size=p.stat().st_size) for p in sorted(self.inbox.iterdir(),key=lambda p:p.name.lower())
+                if p.is_file() and p.suffix.lower()=='.pdf']
+
+    def file_inbox(self, names, committee, meeting_url='', meeting='', held=''):
+        """Move chosen inbox PDFs to raw_documents/<committee>/<meeting date>/. A file whose name matches a paper
+        the app has seen on that meeting page is linked to it, so the meeting shows it as saved."""
+        from problems import resolve
+        committee=' '.join(str(committee).split())
+        safe=re.sub(r'[<>:"/\\|?*\x00-\x1f]','',committee).strip(' .')[:80]
+        if not safe:raise ValueError('Choose a committee.')
+        if held:date.fromisoformat(held)
+        folder=self.root/'data'/'raw_documents'/safe/(held or 'date unknown');folder.mkdir(parents=True,exist_ok=True)
+        known={}
+        if meeting_url:
+            for p in self.papers(meeting_urls=[meeting_url]):
+                known.setdefault(unquote(urlparse(p['url']).path.rsplit('/',1)[-1]).lower(),p)
+        moved=[];matched=0;skipped=[]
+        for name in dict.fromkeys(names):
+            source=self.inbox/Path(name).name
+            if source.parent!=self.inbox or not source.is_file() or source.suffix.lower()!='.pdf' or not is_pdf(source):
+                skipped.append(name);continue
+            target=folder/source.name;n=1
+            while target.exists():target=folder/f'{source.stem} ({n}){source.suffix}';n+=1
+            source.replace(target);rel=target.relative_to(self.root).as_posix();moved.append(rel)
+            paper=known.get(source.name.lower())
+            with self.connect() as db:
+                if paper and not db.execute('SELECT 1 FROM downloads WHERE url=?',(paper['url'],)).fetchone():
+                    db.execute('INSERT INTO downloads VALUES(?,?,?,?,?,?)',(paper['url'],rel,paper['title'],paper['committee'],paper['meeting'],now()))
+                    matched+=1;linked=paper['url']
+                else:linked=''
+            if linked:resolve(self,linked)
+        return dict(moved=moved,matched=matched,skipped=skipped,folder=str(folder))
 
     def lookup_saved(self, docs):
         saved=set()

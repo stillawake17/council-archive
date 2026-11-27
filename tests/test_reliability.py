@@ -102,6 +102,29 @@ class RefusingWebsiteTests(unittest.TestCase):
             self.assertIn('refused the first',summary['note'])
             self.assertEqual(a.latest_attempt()['meetings'],0);self.assertIsNone(a.latest_check())
 
+class InboxTests(unittest.TestCase):
+    def test_files_are_filed_and_matched_to_known_papers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a=Archive(tmp);m='https://council.test/ieListDocuments.aspx?MId=1';x='https://council.test/documents/'
+            a.record_observation(m,'Transport Committee','1 Dec 2026 2.00 pm',[(x+'s1/South%20Bristol%20Report.pdf','South Bristol Report PDF 6 MB')],'<html></html>','2026-11-20T10:00:00+00:00')
+            IssueList(a).append(x+'s1/South%20Bristol%20Report.pdf: HTTP 403')
+            (a.inbox/'South Bristol Report.pdf').write_bytes(b'%PDF-1.4 a')
+            (a.inbox/'Extra appendix.pdf').write_bytes(b'%PDF-1.4 b')
+            (a.inbox/'not really.pdf').write_bytes(b'<html>')
+            self.assertEqual([f['name'] for f in a.inbox_files()],['Extra appendix.pdf','not really.pdf','South Bristol Report.pdf'])
+            r=a.file_inbox(['South Bristol Report.pdf','Extra appendix.pdf','not really.pdf','../escape.pdf'],'Transport Committee',m,'1 Dec 2026 2.00 pm','2026-12-01')
+            self.assertEqual((len(r['moved']),r['matched'],r['skipped']),(2,1,['not really.pdf','../escape.pdf']))
+            self.assertTrue((Path(tmp)/'data/raw_documents/Transport Committee/2026-12-01/Extra appendix.pdf').is_file())
+            self.assertEqual([f['name'] for f in a.inbox_files()],['not really.pdf'])
+            self.assertTrue(a.papers(meeting_urls=[m])[0]['downloaded'])
+            self.assertEqual(items(a),[])                                   # no longer listed as unavailable
+            a.index(lambda s:None,only=r['moved'])
+            with a.connect() as db:rows={r['title']:(r['committee'],r['meeting']) for r in db.execute('SELECT * FROM docs')}
+            self.assertEqual(rows['South Bristol Report PDF 6 MB'],('Transport Committee','1 Dec 2026 2.00 pm'))
+            self.assertEqual(rows['Extra appendix'],('Transport Committee','2026-12-01'))
+            (a.inbox/'Extra appendix.pdf').write_bytes(b'%PDF-1.4 c')        # same name again is kept, not overwritten
+            self.assertTrue(a.file_inbox(['Extra appendix.pdf'],'Transport Committee',held='2026-12-01')['moved'][0].endswith('Extra appendix (1).pdf'))
+
 class UncoveredPaperTests(unittest.TestCase):
     """Papers uncovered when the app learned to read full item lists were not newly published."""
     def test_no_window_for_uncovered_papers(self):

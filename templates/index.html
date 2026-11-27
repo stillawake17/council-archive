@@ -260,6 +260,15 @@ main>p.muted{text-align:center;margin-top:24px}
 <!-- TOOLS -->
 <section id="view-tools" hidden><div class="tools">
 <section class="panel"><h2>Refresh the full meeting list</h2><p>Normal checks read each committee's current page. This reads every older year too, to find meetings missing from the list. It can take 10 minutes or more. No papers are downloaded.</p><button id="rescan" class="secondary">Refresh full meeting list</button></section>
+<section class="panel wide"><h2>Add papers you downloaded yourself</h2>
+<p>For council websites that block this app, download papers in your own browser and save them into this council's inbox folder. Then choose the meeting they belong to and add them. Files whose names match papers listed on that meeting page are linked to them, so the meeting shows them as saved.</p>
+<div class="bar"><button class="secondary" id="openinbox">Open inbox folder</button><button class="secondary" id="refreshinbox">Refresh list</button><span class="muted" id="inboxpath"></span></div>
+<div id="inboxfiles" style="margin:10px 0"></div>
+<div class="bar" style="align-items:flex-end"><div><label class="field" for="inboxcommittee">Committee</label><select id="inboxcommittee"></select></div>
+<div class="grow"><label class="field" for="inboxmeeting">Meeting</label><select id="inboxmeeting" style="width:100%"></select></div>
+<div id="inboxdatebox" hidden><label class="field" for="inboxdate">Meeting date</label><input type="date" id="inboxdate"></div>
+<button id="inboxfile">Add to archive</button></div>
+<p class="muted">Tip: set your browser to ask where to save each file, then pick the inbox folder. The PDFs are moved out of the inbox into the committee's folder and added to search.</p></section>
 <section class="panel"><h2>Add copied PDFs to search</h2><p>Downloads are added to search automatically. Use this if you copied PDFs into the archive folder yourself.</p><button id="index" class="secondary">Add saved PDFs to search</button></section>
 <section class="panel"><h2>Check the website connection</h2><p>Reads up to 6 listing pages and 3 meeting pages to confirm the council site responds. Nothing is downloaded.</p><button id="sitecheck" class="secondary">Check website</button></section>
 <section class="panel"><h2>Read scanned pages (OCR)</h2><p id="ocrstatus" class="muted"></p><p>Recognises words in page images so scanned papers become searchable. Runs locally; originals are untouched. You can stop and resume.</p><div class="bar"><button id="runocr" class="secondary">Read scanned pages / retry failures</button></div>
@@ -459,6 +468,7 @@ async function status(){
     const logText=d.messages.join('\n')||'No activity in this session.',sel=window.getSelection();
     if($('log').textContent!==logText&&!(sel&&!sel.isCollapsed&&$('log').contains(sel.anchorNode))){$('log').textContent=logText;$('log').scrollTop=$('log').scrollHeight}
     if(d.running&&d.action==='ocr'&&view==='tools')refreshOCR();
+    if(view==='tools')inboxButton();
     if(wasRunning&&!d.running)await afterJob();else if(!d.running)refreshPickedIds();
     wasRunning=d.running;
   }catch(e){$('jobtext').textContent='Cannot reach the archive. Check that the launcher window is still open.'}
@@ -664,7 +674,29 @@ $('latecsv').onclick=()=>{const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
 // ---------- TOOLS ----------
 $('rescan').onclick=()=>job('rescan');$('index').onclick=()=>job('index');$('sitecheck').onclick=()=>job('sitecheck');$('runocr').onclick=()=>job('ocr');
 let problemRows=[],problemReport='';
-async function loadTools(){await Promise.all([refreshOCR(),loadProblems(),loadRuns(),loadReplacements()])}
+async function loadTools(){await Promise.all([refreshOCR(),loadProblems(),loadRuns(),loadReplacements(),loadInbox()])}
+let inboxMeetings=[];
+async function loadInbox(){const key=council();try{const d=await get('/api/inbox');if(key!==council())return;
+  $('inboxpath').textContent=d.folder;const box=$('inboxfiles');box.replaceChildren();
+  if(!d.files.length)box.append(el('p','The inbox is empty. Save PDFs into it, then choose Refresh list.','muted'));
+  for(const f of d.files){const l=el('label',undefined,'bar'),b=document.createElement('input');b.type='checkbox';b.checked=true;b.dataset.inbox=f.name;l.style.gap='8px';l.append(b,document.createTextNode(f.name+' ('+Math.max(1,Math.round(f.size/1024))+' KB)'));box.append(l)}
+  const c=$('inboxcommittee'),keep=c.value;c.replaceChildren(new Option('Choose a committee…',''),...committeesData.filter(x=>x.name).map(x=>new Option(x.name,x.name)));c.value=keep;inboxButton();
+}catch(e){$('inboxpath').textContent=e.message}}
+function inboxButton(){const n=document.querySelectorAll('#inboxfiles input:checked').length;$('inboxfile').textContent=n?'Add '+plural(n,'paper')+' to archive':'Add to archive';$('inboxfile').disabled=!n||!!status0.running}
+$('inboxfiles').onchange=inboxButton;
+$('inboxcommittee').onchange=async()=>{const s=$('inboxmeeting');s.replaceChildren();inboxMeetings=[];if(!$('inboxcommittee').value){inboxDate();return}
+  try{const d=await get('/api/meetings',{committee:[$('inboxcommittee').value]});inboxMeetings=d.meetings;
+    const today=isoDay(new Date());inboxMeetings.sort((a,b)=>Math.abs(new Date(a.date||'1900-01-01')-new Date(today))-Math.abs(new Date(b.date||'1900-01-01')-new Date(today)));
+    s.append(...inboxMeetings.map(m=>new Option((m.label||'Date unknown')+(m.papers?' · '+plural(m.papers,'known paper'):''),m.url)),new Option('A meeting not listed here…',''));
+  }catch(e){$('notice').textContent=e.message}inboxDate()};
+function inboxDate(){$('inboxdatebox').hidden=!!$('inboxmeeting').value}
+$('inboxmeeting').onchange=inboxDate;
+$('openinbox').onclick=async()=>{try{await post('openinbox',{})}catch(e){$('notice').textContent=e.message}};
+$('refreshinbox').onclick=loadInbox;
+$('inboxfile').onclick=()=>{const files=[...document.querySelectorAll('#inboxfiles input:checked')].map(b=>b.dataset.inbox),committee=$('inboxcommittee').value,url=$('inboxmeeting').value,m=inboxMeetings.find(x=>x.url===url);
+  if(!committee){$('notice').textContent='Choose a committee.';return}
+  if(!url&&!$('inboxdate').value){$('notice').textContent='Choose a meeting, or enter its date.';return}
+  job('inbox',{files,committee,meeting_url:url,meeting:m?m.label:'',date:m?(m.date||''):$('inboxdate').value})};
 async function loadRuns(){try{const rows=await get('/api/runs');const t=$('runs');t.replaceChildren();
   for(const r of rows){const tr=el('tr');for(const v of[when(r.started)+(r.auto?' (automatic)':''),r.kind==='fetch'?'Download selected papers':'Check meetings',r.scope,r.meetings,r.added+(r.baseline?' (+'+r.baseline+' first check)':''),r.downloaded,(r.failed||0)+(r.note?' · '+r.note:'')])tr.append(el('td',String(v)));t.append(tr)}
   if(!rows.length)t.append(Object.assign(el('tr'),{innerHTML:'<td colspan="7">No checks yet.</td>'}))}catch(e){}}
