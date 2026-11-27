@@ -4,13 +4,15 @@ A local browser app for downloading council papers, searching inside PDFs and re
 
 ## Finding your way around
 
-The app has four tabs. A bar across the top always shows what is running, with progress and a **Stop** button, or when you last checked and what that check found.
+The app has six tabs. A bar across the top always shows what is running, with progress and a **Stop** button, or when you last checked and what that check found.
 
 **New papers** (the opening tab) is for keeping up to date. Choose committees (all, or tick several) and which meetings to look at: upcoming and the last 30 days is the default and takes a few minutes. Click **Check now**. The app reads each chosen committee's current page to spot newly listed meetings, then reads those meeting pages, records any paper links it has not seen before, and, if the box is ticked, downloads them into your archive and adds them to search. Below, **Recently found papers** lists what the latest check (or the last 7, 30 or 90 days) found, grouped by meeting. Each paper says whether it is in your archive and when it appeared: "Appeared between A and B" means the link was absent at one check and present at the next. A red number on the tab shows new papers from the latest check that are not yet downloaded. **Automatic checks** can run the default check every few hours while the app is open.
 
 **Committees & meetings** is for working on particular committees or meetings. Pick a committee on the left (or All committees) and a date range. Each meeting shows how many papers are known and saved and when it was last checked. **Check** reads a meeting page for new links without downloading; **Download all** reads it and downloads anything not yet saved; **Show papers** lists the individual papers so you can tick some. Tick several meetings, or none to act on all shown, and use the buttons above the list.
 
 **Search** looks inside papers already in your archive. Filter by one or several committees and by meeting date, and sort by best match or newest meetings.
+
+**Officer decisions** (ModernGov councils only) tracks the council's register of decisions taken by officers under delegated powers. See [Officer decisions](#officer-decisions) below.
 
 **Tools** holds occasional tasks: refreshing the full meeting list (all older years), adding PDFs you copied in yourself, OCR for scanned pages, the website connection check, check history, unavailable papers (with **Try these papers again**) and replaced PDFs.
 
@@ -82,11 +84,27 @@ Checking for replaced PDFs means downloading saved papers again (the recheck opt
 
 Checks run when you click Check now, or on schedule if Automatic checks are on. The computer must be on and the app open during a check. On-screen observation and replacement lists show at most 500 records; complete histories remain on disk. Keep the computer clock correct and back up these histories.
 
+## Officer decisions
+
+ModernGov councils publish notices of decisions made by officers on a separate register (for Bristol, https://democracy.bristol.gov.uk/mgListOfficerDecisions.aspx). Each notice is a web page giving the decision maker, the decision, whether it is a key decision, whether it is subject to call-in, the date of the decision and the publication date. Only a few have PDFs attached.
+
+Open the **Officer decisions** tab and click **Check officer decisions**. The app reads the register for notices published in the last 90 days, then reads each notice it has not seen before. It saves a copy of each notice page, keeps its text searchable in this tab, and downloads any attached PDF into your archive. Attached PDFs appear in **Search** under the committee name "Officer decisions". Notices published in the last two weeks are read again at each check, so a change of status or wording is noticed; every version of the page is kept. **Fetch all past decisions** reads the whole register back to its start. For Bristol that is over 1,300 notices and takes 30 minutes or more; you can stop it and it carries on from where it stopped next time.
+
+The first check is a baseline. After that, each new notice shows "Appeared between A and B", worked out from this app's own checks of the register. A check counts as A only if it covered the notice's publication date. Each notice also shows how many days passed between the decision and its publication, using the two dates printed on the notice. For example, Bristol decision 3408 was made on 28 August 2026 and published on 21 September 2026, 24 days later. The filters can show only key decisions, only notices published 7 or more days after the decision, and only notices that a check made after their stated publication date did not find. Watch-words from the New papers tab flag notices that mention them. **Save list (.csv)** saves what is shown.
+
+**If the council website refuses the app** (HTTP 403), you can still add notices yourself. Open **Add pages you saved yourself** on the Officer decisions tab. In your own browser, open the officer decisions register and each notice you want, and save each page with Ctrl+S as **Webpage, HTML only**. Save any attached PDF too, keeping its file name. Put them all in the folder the tab shows (`data\saved_decisions` inside the archive folder), then click **Load saved pages**. Save the register page as well: the app uses it to match each notice to its number. Notices added this way show when you loaded them. They carry no "appeared between" times, because the app did not see them appear.
+
+Once you have checked officer decisions once, automatic checks include them. Untick **Include officer decisions in automatic checks** to stop this.
+
+None of these flags proves a rule was broken. The law asks for officer decision records to be made available, but the timing rules depend on the kind of decision and on your council's constitution.
+
+Not every ModernGov council publishes an officer decisions register. If yours does not, the check says so and records nothing. The register's address and layout were checked for Bristol only.
+
 ## Coverage limits
 
 Discovery follows the linked committee pages, up to 2,000 discovery pages, including recognised linked pagination and archive-category pages. A warning appears if the page cap is reached. It does not guarantee every historical year or JavaScript-only pagination path is covered. Previously observed meeting URLs are revisited, as are meeting URLs in data/metadata/COUNCIL_ID_meetings.csv. Finding meetings can be substantial and take time. The full refresh downloads no PDFs.
 
-Committee documents are the supported source. Separate officer-decision registers, procurement portals, constitutions and other council systems are not automatically downloaded. Existing constitution PDFs are searchable. Download selection uses meeting dates. The separate committee filter in the search panel still applies only to search results. Document types other than PDF are reported as failed PDF downloads and not indexed.
+Committee documents and, on ModernGov websites, the officer decisions register are the supported sources. Procurement portals, constitutions and other council systems are not automatically downloaded. Existing constitution PDFs are searchable. Download selection uses meeting dates. The separate committee filter in the search panel still applies only to search results. Document types other than PDF are reported as failed PDF downloads and not indexed.
 
 The first two presets are Bristol and Birmingham. Other ModernGov and CMIS councils need their own checks. No complete historical Birmingham archive has been downloaded as part of creating this app.
 
